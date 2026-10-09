@@ -138,15 +138,10 @@ export function drawRule(r: Rule, w: number, target: string): string {
 
 /** One switch of the Controls section: its name, what it does, and its state. */
 export function drawToggle(name: string, what: string, isOn: boolean, w: number): string {
+  // the switch itself is a real button beside this drawing (a drawing can't be pressed)
   const c = new Canvas(w, 2)
-  const sw = isOn ? INK.green : INK.gray
-  c.raw(
-    `<rect x="${w - 40}" y="6" width="34" height="20" rx="10" fill="${sw}" fill-opacity="${isOn ? 1 : 0.35}"/>` +
-      `<circle cx="${isOn ? w - 16 : w - 30}" cy="16" r="7.5" fill="#fff"/>`,
-    0,
-  )
-  c.line([{ t: name, bold: true, size: 13 }, { t: isOn ? 'on' : 'off', pill: isOn ? INK.green : INK.gray, size: 10.5 }], [{ t: '', size: 10, gap: 0 }, { t: '', size: 10, gap: 36 }], 22)
-  c.text(what, { cls: 's', size: 12, lines: 2, reserve: 52 })
+  c.line([{ t: name, bold: true, size: 13, cls: isOn ? 't' : 's' }], [], 22)
+  c.text(what, { cls: isOn ? 's' : 'm', size: 12, lines: 2 })
   return c.svg()
 }
 

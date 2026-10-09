@@ -250,17 +250,19 @@ export async function panelView(io: Io, E: Table, surface: RenderSurface, cols: 
     for (const c of CONTROLS) {
       const isOn = toggles[c.key]
       sections.push(
-        <Box key={`ctl-${c.key}`} flexDirection="column" marginTop={1}>
-          {Svg ? (
-            <Svg source={drawToggle(c.name, c.what, isOn, w)} alt={`${c.name}: ${isOn ? 'on' : 'off'}. ${c.what}`} />
-          ) : (
-            <Box flexDirection="column">
-              <Text bold>{`${isOn ? '●' : '○'} ${c.name}`}</Text>
-              <Text dimColor wrap="wrap">{c.what}</Text>
-            </Box>
-          )}
-          <Box>
-            <Button key={`tg-${c.key}`} plain dimColor={isOn ? true : undefined} label={isOn ? 'Turn off' : 'Turn on'} onPress={() => void flip(io, c.key)} />
+        <Box key={`ctl-${c.key}`} flexDirection="row" alignItems="flex-start" justifyContent="space-between" columnGap={1} marginTop={1}>
+          <Box flexGrow={1} flexShrink={1} minWidth={0}>
+            {Svg ? (
+              <Svg width={w - 90} source={drawToggle(c.name, c.what, isOn, w - 90)} alt={`${c.name}: ${isOn ? 'on' : 'off'}. ${c.what}`} />
+            ) : (
+              <Box flexDirection="column">
+                <Text bold>{c.name}</Text>
+                <Text dimColor wrap="wrap">{c.what}</Text>
+              </Box>
+            )}
+          </Box>
+          <Box flexShrink={0}>
+            <Button key={`tg-${c.key}`} variant={isOn ? 'primary' : undefined} label={isOn ? '● On' : '○ Off'} onPress={() => void flip(io, c.key)} />
           </Box>
         </Box>,
       )

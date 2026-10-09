@@ -12,7 +12,7 @@ export const BUILTIN_KNOW = 'cc-plugin-you-should-know@builtin'
 export const CONTROLS: { key: keyof Toggles; name: string; what: string }[] = [
   { key: 'know', name: 'You should know · after each task', what: 'When a task finishes, 1–3 plain notes on risks, side effects, assumptions or decisions left to you. About one short extra reply per task.' },
   { key: 'builtinKnow', name: 'You should know · while working (Anthropic)', what: "Anthropic's built-in mod: a second agent watches longer tasks and flags what you might miss as it happens. Uses extra tokens; applies from your next session." },
-  { key: 'next', name: "What's next", what: 'After an answer, up to 3 likely next prompts; press 1–3 to put one in the prompt box (nothing is sent for you).' },
+  { key: 'next', name: "What's next", what: 'After an answer, up to 3 likely next prompts; the → beside one puts it in the prompt box (nothing is sent for you).' },
   { key: 'replay', name: 'Replay', what: 'After a task that edited files, a card to step through every edit as a diff, in order.' },
   { key: 'reflect', name: 'Reflect', what: 'When you correct Claude ("no, we always…"), offer to save it as a rule in CLAUDE.md, for this project or all.' },
 ]

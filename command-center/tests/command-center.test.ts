@@ -115,8 +115,13 @@ describe('views validate on every surface', () => {
         await ui.press({ key: `tab-${id}` })
         expect(await ui.find({ key: `tab-${id}` })).toBeDefined()
       }
+      await ui.press({ key: 'tab-controls' })
+      const before = (await ui.find({ key: 'tg-next' })) as { props?: { label?: string } } | undefined
       await ui.press({ key: 'tg-next' })
-      expect(await ui.find({ key: 'tg-next' })).toBeDefined()
+      const after = (await ui.find({ key: 'tg-next' })) as { props?: { label?: string } } | undefined
+      expect([before?.props?.label, after?.props?.label]).toEqual(['● On', '○ Off'])
+      await ui.press({ key: 'tg-next' })
+      expect(((await ui.find({ key: 'tg-next' })) as { props?: { label?: string } } | undefined)?.props?.label).toBe('● On')
       await ui.unmount()
     }
   })
