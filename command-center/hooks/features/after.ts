@@ -9,15 +9,15 @@ import { me, turn } from './session'
 // After Claude finishes something, cards under its reply: the receipt (time, tools,
 // lines changed, cost), what you should know (risks, assumptions, side
 // effects, anything left for you to decide) and up to three next actions.
-// Both come from ONE fork of the session: it shares the prompt cache, so it
-// costs about one short reply, and it is skipped when both are switched off.
-// Next actions use the technique of Anthropic's next-steps mod.
+// Both come from ONE quick-model call (Haiku) over a short summary of the task
+// (the request, what changed, Claude's answer, the goal so far): seconds, not
+// the minute a fork of the whole session took. Skipped when both are off.
 
 const MIN_ANSWER = 80
 
 function ask(wantKnow: boolean, wantNext: boolean, skills: string): string {
   return (
-    'Do not continue the task. Look back at the turn you just finished and answer with ONLY a JSON object, no prose, no code fence:\n' +
+    'You review a task an AI coding assistant just finished for its user (described below). Answer with ONLY a JSON object, no prose, no code fence:\n' +
     '{"goal": {...}, "know": [...], "next": [{"label": "...", "prompt": "..."}]}\n\n' +
     '"goal": the overall goal of this whole session as {"title": "<at most 8 words>", "steps": [{"text": "<at most 60 characters>", "done": true|false}]}: ' +
     '3 to 7 steps that cover the whole goal from the start, done = finished so far. Keep earlier steps stable; add or tick, do not rename.\n' +
@@ -90,7 +90,14 @@ export async function turnFinished(io: Io, e: TurnCompleteInput, toggles: Toggle
       const commands = wantNext ? await io.commands() : null
       const known = commands ? new Set(commands.map(c => c.name)) : null
       const skills = (commands ?? []).filter(c => c.source !== 'builtin').slice(0, 60).map(c => `/${clean(c.name, 64)}: ${clean(c.description, 100)}`).join('\n')
-      const reply = await io.fork(ask(wantKnow, wantNext, skills))
+      const goalNow = await io.s.goal.get()
+      const brief = [
+        `The user's request:\n"""${me.lastAsk || me.lastPrompt}"""`,
+        `What was done: ${turn.tools} tool calls; files changed: ${[...turn.files].map(f => f.split('/').pop()).join(', ') || 'none'} (+${turn.added} -${turn.removed} lines).`,
+        `The assistant's final answer:\n"""${e.answer.slice(-6000)}"""`,
+        goalNow ? `The session goal so far: ${JSON.stringify({ title: goalNow.title, steps: goalNow.steps })}` : 'No session goal recorded yet.',
+      ].join('\n\n')
+      const reply = await io.complete(ask(wantKnow, wantNext, skills), brief, 1200)
       if (reply?.isAnswered) found = parse(reply.text, known)
     } catch (error) {
       io.debug(`after: ${String(error)}`)

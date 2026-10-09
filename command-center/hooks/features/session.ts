@@ -10,7 +10,7 @@ import type { Io } from '../lib/io'
 // Claude is doing right now, and a heartbeat file per session in
 // ~/.claude/command-center/sessions so each session can see the others.
 
-export const me = { home: '', id: '', root: '', cwd: '', title: '', dir: '', startedAt: 0, lastPrompt: '' }
+export const me = { home: '', id: '', root: '', cwd: '', title: '', dir: '', startedAt: 0, lastPrompt: '', lastAsk: '' }
 
 /** The turn being run: counts for the card after it. */
 export const turn = { id: '', tools: 0, files: new Set<string>(), added: 0, removed: 0, startedAt: 0, costAtStart: null as number | null }
@@ -85,6 +85,7 @@ const isTyped = (text: string): boolean => !!text.trim() && !/^\s*[/<[]/.test(te
 export function prompted(text: string): void {
   if (!isTyped(text)) return
   me.lastPrompt = clean(text, 160)
+  me.lastAsk = text.slice(0, 2000)
   if (!me.title) me.title = clean(text, 80)
 }
 

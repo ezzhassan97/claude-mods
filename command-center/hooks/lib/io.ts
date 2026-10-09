@@ -1,4 +1,4 @@
-import type { AgentInfo, CommandInfo, FsEntry, ModelCompleteResult, ModelForkResult, PluginState, RenderSurface, SessionMessage, SessionUsage } from 'claude-code'
+import type { AgentInfo, CommandInfo, FsEntry, ModelCompleteResult, PluginState, RenderSurface, SessionMessage, SessionUsage } from 'claude-code'
 
 // The one door to the engine. register.tsx builds it from `$` (the engine
 // follows `$` only within the file that receives it, and reads state atoms
@@ -27,8 +27,7 @@ export type Io = {
   usage: () => Promise<SessionUsage | null>
   agents: () => Promise<AgentInfo[] | null>
   commands: () => Promise<CommandInfo[] | null>
-  fork: (prompt: string) => Promise<ModelForkResult | null>
-  complete: (system: string, prompt: string) => Promise<ModelCompleteResult | null>
+  complete: (system: string, prompt: string, maxTokens?: number) => Promise<ModelCompleteResult | null>
   /** A tool on a connected MCP server, found by its name suffix (`__getJiraIssue`). */
   /** Calls the tool on each connected server that has it, in turn, until `accept` takes the answer (the last one otherwise). */
   mcp: (toolSuffix: string, args: Record<string, unknown>, accept?: (result: unknown) => boolean) => Promise<unknown>

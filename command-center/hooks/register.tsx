@@ -119,8 +119,7 @@ function makeIo($: EngineInterface): Io {
     usage: () => $.session.usage().catch(() => null),
     agents: () => $.agent.list().catch(() => null),
     commands: () => $.command.list().catch(() => null),
-    fork: prompt => $.model.fork({ prompt }).catch(() => null),
-    complete: (system, prompt) => $.model.complete({ model: 'haiku', system, prompt, maxTokens: 300, timeoutMs: 30_000 }).catch(() => null),
+    complete: (system, prompt, maxTokens = 300) => $.model.complete({ model: 'haiku', system, prompt, maxTokens, timeoutMs: 30_000 }).catch(() => null),
     // Several connectors may offer one tool (two Atlassian ones answer Jira differently):
     // try each until one gives an answer `accept` takes, and remember it first next time.
     mcpTools: async suffix => (await $.tool.list()).map(t => t.name).filter(n => n.startsWith('mcp__') && n.endsWith(suffix)),

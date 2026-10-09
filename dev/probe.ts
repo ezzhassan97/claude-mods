@@ -35,7 +35,6 @@ const io: Io = {
   usage: async () => null,
   agents: async () => [],
   commands: async () => [],
-  fork: async () => null,
   complete: async () => null,
   mcp: async () => (jiraFixture ? JSON.parse(fs.readFileSync(jiraFixture, 'utf8')) : null),
   mcpTools: async () => [],

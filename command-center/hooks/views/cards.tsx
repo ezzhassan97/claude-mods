@@ -42,7 +42,7 @@ export async function cardsView(io: Io, E: Table, surface: RenderSurface, cols: 
       {picture}
       {rows}
       {buttons.length ? (
-        <Box justifyContent="flex-end" columnGap={1}>
+        <Box justifyContent="flex-end" columnGap={1} marginTop={rows.length ? 1 : 0}>
           {buttons}
         </Box>
       ) : null}
@@ -87,13 +87,14 @@ export async function cardsView(io: Io, E: Table, surface: RenderSurface, cols: 
       card(
         'next',
         Svg ? <Svg width={inner} source={drawNextHead(inner)} alt="What's next" /> : <Text color="suggestion">What's next · goes into your prompt box, nothing is sent</Text>,
-        [<Button key="next-close" plain dimColor label="Dismiss" onPress={close('next')} />],
+        [<Button key="next-close" label="Dismiss" onPress={close('next')} />],
         after.next.map((n, i) => (
           <Box key={`next-row-${i}`} flexDirection="row" alignItems="center" justifyContent="space-between" columnGap={1}>
             <Box flexGrow={1} flexShrink={1} minWidth={0}>
-              {Svg ? <Svg width={inner - 50} source={drawNextRow(n, i, inner - 50)} alt={`${i + 1}. ${n.label}: ${n.prompt}`} /> : <Text wrap="truncate-end">{`${i + 1}. ${n.label} — ${n.prompt}`}</Text>}
+              {Svg ? <Svg isInteractive width={inner - 84} source={drawNextRow(n, i, inner - 84)} alt={`${i + 1}. ${n.label}: ${n.prompt}`} /> : <Text wrap="truncate-end">{`${i + 1}. ${n.label} — ${n.prompt}`}</Text>}
             </Box>
-            <Box flexShrink={0}>
+            <Box flexShrink={0} columnGap={1}>
+              <Button key={`next-copy-${i}`} plain dimColor label="⧉" onPress={() => void io.copy(n.prompt, surface).then(ok => io.toast(ok ? 'Copied' : "Couldn't copy", 2000))} />
               <Button key={`next-${i}`} plain label="→" onPress={() => void takeNext(io, n)} />
             </Box>
           </Box>

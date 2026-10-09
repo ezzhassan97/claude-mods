@@ -1,7 +1,7 @@
 {
   "name": "command-center",
-  "version": "0.2.0",
-  "description": "What this session is on, at a glance, in any project: a bar above the prompt (ticket, branches and commits, worktree, environment, PRs, progress, usage), one side panel (overview, agents, files, GitHub, Jira, Vercel, controls), a card after each task (replay, what you should know, next actions), reflect,. Enforces ims-nawy's rules inside ims-nawy.",
+  "version": "0.3.0",
+  "description": "What this session is on, at a glance, in any project: a bar above the prompt (ticket, branches and commits, worktree, environment, PRs, progress, usage), one side panel (overview, GitHub branch diagram, Jira, agents, files, sessions, skills & plugins, controls), and cards under Claude's reply after each task (you should know, replay, what's next, save a rule).",
   "author": {
     "name": "Ezz Hassan"
   },
