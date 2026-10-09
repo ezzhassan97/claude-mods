@@ -47,7 +47,7 @@ const afterA = atom({ plugin: 'command-center', key: 'after' } as const, null)
 const rulesA = atom({ plugin: 'command-center', key: 'rules' } as const, [])
 const heldA = atom({ plugin: 'command-center', key: 'held' } as const, null)
 const togglesA = atom({ plugin: 'command-center', key: 'toggles' } as const, DEFAULT_TOGGLES)
-const panelA = atom({ plugin: 'command-center', key: 'panel' } as const, { collapsed: [], replay: null, showAllPrs: false, isPicking: false })
+const panelA = atom({ plugin: 'command-center', key: 'panel' } as const, { tab: 'overview', replay: null, showAllPrs: false, isPicking: false })
 
 function cells($: EngineInterface): Cells {
   return {

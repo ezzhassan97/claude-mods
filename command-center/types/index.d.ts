@@ -157,7 +157,7 @@ export type Held = { command: string; title: string; summary: string; lines: { n
 /** `builtinKnow` is Anthropic's built-in mod (cc-plugin-you-should-know), the rest are this mod's. */
 export type Toggles = { next: boolean; know: boolean; builtinKnow: boolean; replay: boolean; reflect: boolean; guard: boolean }
 
-export type Panel = { collapsed: string[]; replay: number | null; showAllPrs: boolean; isPicking: boolean }
+export type Panel = { tab: string; replay: number | null; showAllPrs: boolean; isPicking: boolean }
 
 /** One Claude Code session, as its heartbeat file says (any project). */
 export type Beat = {

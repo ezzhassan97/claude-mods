@@ -130,14 +130,13 @@ describe('views validate on every surface', () => {
       await ui.unmount()
     }
   })
-  test('the panel: every section folds and unfolds', async ($, on) => {
+  test('the panel: every tab opens', async ($, on) => {
     world(on)
     for (const surface of ['terminal', 'desktop'] as const) {
       const ui = await $.ui.mount({ plugin: 'command-center', surface, component: 'Pane', requestId: 'command-center', props: PANE as never })
       for (const id of ['overview', 'files', 'github', 'controls']) {
-        expect(await ui.find({ key: `sec-${id}` })).toBeDefined()
-        await ui.press({ key: `sec-${id}` })
-        await ui.press({ key: `sec-${id}` })
+        await ui.press({ key: `tab-${id}` })
+        expect(await ui.find({ key: `tab-${id}` })).toBeDefined()
       }
       await ui.press({ key: 'tg-next' })
       expect(await ui.find({ key: 'tg-next' })).toBeDefined()

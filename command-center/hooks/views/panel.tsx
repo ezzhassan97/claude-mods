@@ -12,9 +12,9 @@ import { basename, money, plural, trunc } from '../lib/fmt'
 import type { Io } from '../lib/io'
 import { drawAgents, drawDeploys, drawFiles, drawJira, drawOverview, drawPr, drawPrList, drawTimeline, drawToggle, prLook, unified } from './draw'
 
-// The side panel: one panel, sections stacked (Overview, Agents, Files,
-// GitHub, Jira, Vercel when the branch deploys there, Controls), each
-// folding on its header. Replay takes the panel over until "Back".
+// The side panel: one panel with tabs (Overview, Agents, Files, GitHub,
+// Jira, Vercel when the branch deploys there, Controls); only the selected
+// tab's content shows. Replay takes the panel over until "Back".
 
 type Table = Elements[RenderSurface]
 
@@ -59,13 +59,22 @@ export async function panelView(io: Io, E: Table, surface: RenderSurface, cols: 
     )
   }
 
-  const isOpen = (id: string): boolean => !panel.collapsed.includes(id)
-  const header = (id: string, label: string, aside = ''): RenderElement => (
-    <Box key={`h-${id}`} justifyContent="space-between" marginTop={1}>
-      <Button key={`sec-${id}`} plain label={`${isOpen(id) ? '▾' : '▸'} ${label}`} onPress={() => void io.s.panel.set(p => ({ ...p, collapsed: isOpen(id) ? [...p.collapsed, id] : p.collapsed.filter(c => c !== id) }))} />
-      {aside ? <Text dimColor>{aside}</Text> : null}
-    </Box>
-  )
+  // Tabs: one row at the top, only the selected tab's content below.
+  const available = ['overview', ...(agents.length ? ['agents'] : []), 'files', 'github', ...(focus?.ticket || ticket ? ['jira'] : []), ...(github.deploys.length ? ['deploys'] : []), 'controls']
+  const active = available.includes(panel.tab) ? panel.tab : 'overview'
+  const isOpen = (id: string): boolean => id === active
+  const tabs: { id: string; label: string }[] = []
+  const header = (id: string, label: string, aside = ''): RenderElement => {
+    tabs.push({ id, label })
+    return id === active ? (
+      <Box key={`h-${id}`} justifyContent="space-between" marginTop={1}>
+        <Text bold>{label}</Text>
+        {aside ? <Text dimColor>{aside}</Text> : null}
+      </Box>
+    ) : (
+      <Box key={`h-${id}`} />
+    )
+  }
   const picture = (svg: string, alt: string, fallback: string[]): RenderElement =>
     Svg ? <Svg source={svg} alt={alt} /> : <Box flexDirection="column">{fallback.map((l, i) => <Text key={`fb-${i}`} wrap="truncate-end" dimColor={i > 0}>{l}</Text>)}</Box>
 
@@ -188,5 +197,20 @@ export async function panelView(io: Io, E: Table, surface: RenderSurface, cols: 
     if (ws.imsRoot) sections.push(<Text key="ims-on" dimColor wrap="wrap">{'Always on in ims-nawy: its rules (PRs into staging, Mazen reviews, no merges, the nawy token, schema changes ask first).'}</Text>)
   }
 
-  return <Box flexDirection="column">{sections}</Box>
+  const badge: Record<string, string> = {
+    agents: running ? ` ${running}` : '',
+    files: changed ? ` ${changed}` : '',
+    github: hot ? ` ${hot}!` : github.focus.length ? ` ${github.focus.length}` : '',
+    jira: ticket?.requirements.length ? ` ${done}/${ticket.requirements.length}` : '',
+  }
+  return (
+    <Box flexDirection="column">
+      <Box key="tabs" flexWrap="wrap" columnGap={1}>
+        {tabs.map((t, i) => (
+          <Button key={`tab-${t.id}`} hotkey={String(i + 1)} plain={t.id === active ? undefined : true} variant={t.id === active ? 'primary' : undefined} dimColor={t.id === active ? undefined : true} label={`${t.label}${badge[t.id] ?? ''}`} onPress={() => void io.s.panel.set(p => ({ ...p, tab: t.id }))} />
+        ))}
+      </Box>
+      {sections}
+    </Box>
+  )
 }
