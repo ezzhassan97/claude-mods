@@ -4,7 +4,7 @@
 import { writeFileSync } from 'node:fs'
 
 import type { After, Agent, Beat, Edit, Env, Focus, Github, Held, Pr, Rule, Ticket, Touch, Usage } from '../command-center/types'
-import { drawAgents, drawBar, drawDeploys, drawFiles, drawHeld, drawJira, drawKnow, drawNext, drawOverview, drawPr, drawPrList, drawReplay, drawRule, drawTimeline, drawToggle } from '../command-center/hooks/views/draw'
+import { drawAgents, drawBar, drawDeploys, drawFiles, drawHeld, drawJira, drawKnow, drawNextHead, drawNextRow, drawOverview, drawPr, drawPrList, drawReplay, drawRule, drawTimeline, drawToggle } from '../command-center/hooks/views/draw'
 import { CONTROLS } from '../command-center/hooks/features/controls'
 
 const now = Date.parse('2026-10-09T18:00:00Z')
@@ -89,7 +89,8 @@ const blocks: [string, string][] = [
   ['Bar · any other repo', drawBar(generic, W)],
   ['Card · you should know', drawKnow(after.know, W, false)],
   ['Card · replay', drawReplay(after, ['/x/src/AmenityMap.tsx', '/x/src/usePinCluster.ts', '/x/src/amenity.mapper.ts'], W)],
-  ['Card · what\'s next', drawNext(W)],
+  ['Card · what\'s next (head)', drawNextHead(W)],
+  ...after.next.map((n, i): [string, string] => [`Card · what's next row ${i + 1}`, drawNextRow(n, i, W - 90)]),
   ['Card · reflect', drawRule(rule, W, './CLAUDE.md')],
   ['Card · guard', drawHeld(held, W)],
   ['Panel · overview', drawOverview({ ...bar, agents, startedAt: now - 47 * min, now, others, goal: { title: 'Masterplan amenities enhancements', steps: [{ text: 'Touchpad zoom and wider range', done: true }, { text: 'Amenity names on the masterplan', done: true }, { text: 'Collapsible amenities column', done: false }, { text: 'Test on staging and open the PRs', done: false }], at: now } }, P)],

@@ -100,11 +100,18 @@ export function drawKnow(know: string[], w: number, isLoading: boolean): string 
   return c.svg()
 }
 
-/** What's next: a header for the suggestion buttons under it (they only fill the prompt box). */
-export function drawNext(w: number): string {
-  const c = new Canvas(w, 14, { bar: true }).space(4)
-  c.label("What's next", 'click one, or press 1–3: it goes into your prompt box, nothing is sent', INK.blue)
-  return c.space(2).svg()
+/** What's next, the card's head: icon badge and title (the card itself is a framed box). */
+export function drawNextHead(w: number): string {
+  const c = new Canvas(w, 0, { icon: 'next', ink: INK.blue, bare: true }).space(12)
+  c.label("What's next", 'it goes into your prompt box, nothing is sent', INK.blue)
+  return c.space(Math.max(4, 46 - c.height)).svg() // room for the icon badge
+}
+
+/** One suggestion row: its number, label and the prompt it writes. */
+export function drawNextRow(n: { label: string; prompt: string }, i: number, w: number): string {
+  const c = new Canvas(w, 54)
+  c.line([{ t: String(i + 1), color: INK.blue, bold: true, size: 12.5 }, { t: n.label, bold: true, size: 13 }, { t: n.prompt === n.label ? '' : n.prompt, cls: 'm', size: 12, grow: true }], [], 24)
+  return c.svg()
 }
 
 /** Replay: the edits of the task you just finished, ready to step through. */

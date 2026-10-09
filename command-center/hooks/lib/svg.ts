@@ -115,7 +115,7 @@ const ICON: Record<Icon, string> = {
 }
 
 /** A card: framed background, an icon badge on the left, content beside it. */
-export type Frame = { icon: Icon; ink: string } | { bar: true }
+export type Frame = { icon: Icon; ink: string; bare?: boolean } | { bar: true }
 
 export class Canvas {
   private parts: string[] = []
@@ -255,9 +255,9 @@ export class Canvas {
     const h = Math.ceil(this.y)
     let back = ''
     if (this.frame && 'icon' in this.frame) {
-      const { icon, ink } = this.frame
+      const { icon, ink, bare } = this.frame
       back =
-        `<rect class="card" x=".5" y=".5" width="${this.fluid ? '99.8%' : this.w - 1}" height="${h - 1}" rx="12" stroke-width="1"/>` +
+        (bare ? '' : `<rect class="card" x=".5" y=".5" width="${this.fluid ? '99.8%' : this.w - 1}" height="${h - 1}" rx="12" stroke-width="1"/>`) +
         `<circle cx="27" cy="28" r="15" fill="${ink}" fill-opacity=".15"/>` +
         `<g transform="translate(16.5 17.5) scale(.875)" fill="none" stroke="${ink}" color="${ink}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">${ICON[icon]}</g>`
     } else if (this.frame) {
