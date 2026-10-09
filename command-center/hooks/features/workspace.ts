@@ -95,7 +95,7 @@ async function branchOf(io: Io, root: string, side: Side): Promise<Branch | null
       const [sha = '', at = '0', author = '', ...rest] = line.split('\t')
       return { sha, at: Number(at) * 1000, author, subject: clean(rest.join(' '), 120), isPushed: i >= unpushed }
     }),
-    staging: hasStaging && !onBase ? { ahead: stagingAhead, isIn: isInStaging } : null,
+    staging: hasStaging && !onBase ? { ahead: stagingAhead, isIn: commits > 0 && isInStaging } : null, // a branch with no commits of its own is trivially "in" staging
   }
 }
 

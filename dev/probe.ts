@@ -69,7 +69,7 @@ console.log('ticket', ticket?.key, ticket?.status, 'requirements', ticket?.requi
 const d = { focus, env: state.env as never, ticket: state.ticket as never, github: state.github as never, usage: state.usage as never, status: 'idle' as const, title: '', progress: ticket?.requirements.length ? { done: 1, total: ticket.requirements.length } : null }
 const blocks: [string, string][] = [
   ['Bar (real data)', drawBar(d, 780)],
-  ['Overview (real data)', drawOverview({ ...d, agents: [], startedAt: Date.now() - 47 * 60_000, now: Date.now(), others: [] }, 560)],
+  ['Overview (real data)', drawOverview({ ...d, startedAt: Date.now() - 47 * 60_000, now: Date.now(), goal: null }, 560)],
   ...(state.ticket ? [['Jira (real data)', drawJira(state.ticket as never, 560, Date.now())] as [string, string]] : []),
   ...(state.github as { focus: never[] }).focus.map(p => ['GitHub (real data)', drawPr(p, 560, Date.now())] as [string, string]),
 ]

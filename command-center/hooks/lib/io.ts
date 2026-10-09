@@ -51,7 +51,9 @@ export function json<T>(text: string): T | null {
   }
 }
 
-export const git = (io: Io, cwd: string, ...args: string[]): Promise<Ran> => io.run(['git', '-C', cwd, ...args])
+// GIT_OPTIONAL_LOCKS=0: reading never rewrites the index or takes its lock, so the
+// plugin's polling can't collide with your own git commands.
+export const git = (io: Io, cwd: string, ...args: string[]): Promise<Ran> => io.run(['git', '-C', cwd, ...args], { env: { GIT_OPTIONAL_LOCKS: '0' } })
 
 /** True when something listens on 127.0.0.1:<port>. */
 export const isOpen = async (io: Io, port: number): Promise<boolean> =>

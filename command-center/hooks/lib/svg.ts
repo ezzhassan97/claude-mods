@@ -119,15 +119,9 @@ export type Frame = { icon: Icon; ink: string; bare?: boolean } | { bar: true }
 
 export class Canvas {
   private parts: string[] = []
-  /** Right-hand content of a fluid canvas, drawn from the real right edge. */
-  private rights: string[] = []
   y = 0
   readonly pad: number
-  /**
-   * `fluid`: the drawing stretches to its slot (width 100%); `w` is only the
-   * estimate used to fit text, and right-hand content hugs the real edge.
-   */
-  constructor(readonly w: number, pad = 0, private readonly frame?: Frame, private readonly fluid = false) {
+  constructor(readonly w: number, pad = 0, private readonly frame?: Frame) {
     this.pad = frame && 'icon' in frame ? 54 : pad
   }
 
@@ -162,8 +156,7 @@ export class Canvas {
     let rx = this.w - this.rpad - rightW
     for (const [i, s] of right.entries()) {
       if (i) rx += gapOf(s)
-      const seg = drawSeg(s, this.fluid ? rx - this.w : rx, base, s.t ?? '')
-      ;(this.fluid ? this.rights : this.parts).push(seg)
+      this.parts.push(drawSeg(s, rx, base, s.t ?? ''))
       rx += segWidth(s)
     }
     this.y += h
@@ -174,7 +167,7 @@ export class Canvas {
   label(text: string, aside = '', color?: string): this {
     const base = this.y + 13
     this.parts.push(`<text x="${this.pad}" y="${base}" font-family="${SANS}" font-size="${10.5 * FONT}" font-weight="600" letter-spacing=".7" ${color ? `fill="${color}"` : 'class="s"'}>${esc(text.toUpperCase())}</text>`)
-    if (aside) (this.fluid ? this.rights : this.parts).push(`<text x="${this.fluid ? -this.rpad : this.w - this.rpad}" y="${base}" text-anchor="end" font-family="${SANS}" font-size="${11 * FONT}" class="m">${esc(aside)}</text>`)
+    if (aside) this.parts.push(`<text x="${this.w - this.rpad}" y="${base}" text-anchor="end" font-family="${SANS}" font-size="${11 * FONT}" class="m">${esc(aside)}</text>`)
     this.y += 20
     return this
   }
@@ -264,15 +257,11 @@ export class Canvas {
     if (this.frame && 'icon' in this.frame) {
       const { icon, ink, bare } = this.frame
       back =
-        (bare ? '' : `<rect class="card" x=".5" y=".5" width="${this.fluid ? '99.8%' : this.w - 1}" height="${h - 1}" rx="12" stroke-width="1"/>`) +
+        (bare ? '' : `<rect class="card" x=".5" y=".5" width="${this.w - 1}" height="${h - 1}" rx="12" stroke-width="1"/>`) +
         `<circle cx="27" cy="28" r="15" fill="${ink}" fill-opacity=".15"/>` +
         `<g transform="translate(16.5 17.5) scale(.875)" fill="none" stroke="${ink}" color="${ink}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">${ICON[icon]}</g>`
     } else if (this.frame) {
-      back = `<rect class="bar" x=".5" y=".5" width="${this.fluid ? '99.8%' : this.w - 1}" height="${h - 1}" rx="10" stroke-width="1"/>`
-    }
-    if (this.fluid) {
-      const edge = `<svg x="100%" y="0" width="1" height="${h}" overflow="visible">${this.rights.join('')}</svg>`
-      return `<svg xmlns="http://www.w3.org/2000/svg" width="100%" height="${h}" style="min-width:${Math.min(this.w, 320)}px"><style>${STYLE}</style>${back}${this.parts.join('')}${edge}</svg>`
+      back = `<rect class="bar" x=".5" y=".5" width="${this.w - 1}" height="${h - 1}" rx="10" stroke-width="1"/>`
     }
     return `<svg xmlns="http://www.w3.org/2000/svg" width="${this.w}" height="${h}" viewBox="0 0 ${this.w} ${h}"><style>${STYLE}</style>${back}${this.parts.join('')}</svg>`
   }

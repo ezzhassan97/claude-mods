@@ -362,12 +362,12 @@ export function drawGraph(b: Branch, pr: Pr | null | undefined, w: number, sessi
   const span = Math.max(60, (right - fork - 60) * 0.62)
   const step = shown.length > 1 ? span / (shown.length - 1) : 0
   const x0 = fork + 34
-  const tipX = x0 + step * Math.max(0, shown.length - 1)
+  const tipX = shown.length ? x0 + step * (shown.length - 1) : fork + 18 // no commits: the branch is just its start
   // main since the fork
   if (b.behindBase) {
     const n = Math.min(6, b.behindBase)
-    for (let i = 0; i < n; i++) parts.push(`<circle cx="${tipX - 10 - (n - 1 - i) * 12}" cy="${yMain}" r="2.6" fill="${INK.gray}" fill-opacity=".8"/>`)
-    parts.push(text(tipX + 2, yMain - 5, `+${b.behindBase} since`, { cls: 'm', size: 10 }))
+    for (let i = 0; i < n; i++) parts.push(`<circle cx="${fork + 24 + i * 12}" cy="${yMain}" r="2.6" fill="${INK.gray}" fill-opacity=".8"/>`)
+    parts.push(text(fork + 24 + n * 12 + 2, yMain - 5, `+${b.behindBase} on ${b.base ?? 'main'} since you branched`, { cls: 'm', size: 10 }))
   }
   // the branch
   parts.push(text(4, yBranch + 4, tag === '⎇' ? 'branch' : tag, { color: ink }), `<path d="M${fork} ${yMain} C ${fork} ${yBranch}, ${fork} ${yBranch}, ${fork + 18} ${yBranch} L ${tipX} ${yBranch}" fill="none" stroke="${ink}" stroke-width="2"/>`)
@@ -377,9 +377,8 @@ export function drawGraph(b: Branch, pr: Pr | null | undefined, w: number, sessi
     const mine = k.at >= sessionStart
     parts.push(k.isPushed ? `<circle cx="${x}" cy="${yBranch}" r="4.5" fill="${mine ? ink : 'none'}" stroke="${ink}" stroke-width="2"${mine ? '' : ' class="card"'}/>` : `<circle cx="${x}" cy="${yBranch}" r="4.5" class="card" stroke="${ink}" stroke-width="2" stroke-dasharray="2 2"/>`)
   })
-  if (!shown.length) parts.push(text(fork + 24, yBranch + 4, 'no commits yet', { cls: 'm', size: 10.5 }))
   const unpushed = b.log.filter(k => !k.isPushed).length
-  parts.push(text(tipX + 10, yBranch + 4, `${plural(b.commits, 'commit')}${unpushed ? ` · ${unpushed} not pushed` : ''}`, { color: unpushed ? INK.amber : undefined, cls: 's', size: 10.5 }))
+  parts.push(text(tipX + 10, yBranch + 4, shown.length ? `${plural(b.commits, 'commit')}${unpushed ? ` · ${unpushed} not pushed` : ''}` : `no commits yet${b.dirty ? ` · ${b.dirty} uncommitted` : ''}`, { color: unpushed || (!shown.length && b.dirty) ? INK.amber : undefined, cls: shown.length ? 's' : 'm', size: 10.5 }))
   // staging and the PR
   let h = yBranch + 16
   if (b.staging) {
@@ -388,8 +387,8 @@ export function drawGraph(b: Branch, pr: Pr | null | undefined, w: number, sessi
     if (toStaging) {
       const merged = b.staging.isIn || pr?.state === 'MERGED'
       parts.push(`<path d="M${tipX} ${yBranch + 5} C ${tipX} ${yStaging}, ${tipX} ${yStaging}, ${tipX + 22} ${yStaging}" fill="none" stroke="${merged ? INK.teal : ink}" stroke-width="2"${merged ? '' : ' stroke-dasharray="4 3"'}/>`, `<circle cx="${tipX + 22}" cy="${yStaging}" r="3.5" fill="${merged ? INK.teal : 'none'}" stroke="${merged ? INK.teal : ink}" stroke-width="1.5"/>`)
-      parts.push(text(tipX + 32, yStaging + 4, merged ? 'in staging' : pr ? `PR #${pr.number} open` : '', { color: merged ? INK.teal : undefined, cls: 's', size: 10.5 }))
-    } else parts.push(text(tipX + 10, yStaging + 4, b.staging.ahead ? `${plural(b.staging.ahead, 'commit')} not in staging` : 'nothing new for staging', { cls: 'm', size: 10.5 }))
+      parts.push(text(tipX + 30, yStaging - 5, merged ? 'in staging' : pr ? `PR #${pr.number} open` : '', { color: merged ? INK.teal : undefined, cls: 's', size: 10.5 }))
+    } else parts.push(text(tipX + 10, yStaging - 5, b.staging.ahead ? `${plural(b.staging.ahead, 'commit')} not in staging` : 'nothing new for staging', { cls: 'm', size: 10.5 }))
     h = yStaging + 14
   }
   c.raw(parts.join(''), h)

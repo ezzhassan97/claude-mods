@@ -22,8 +22,6 @@ import { diffPage, drawAgents, drawCommits, drawDeploys, drawFiles, drawGraph, d
 
 type Table = Elements[RenderSurface]
 
-export const PANEL = 'command-center'
-
 export async function panelView(io: Io, E: Table, surface: RenderSurface, cols: number, rows: number): Promise<RenderElement> {
   const { Box, Text, Button, Link, Code } = E
   const Select = 'Select' in E ? (E as Elements['desktop']).Select : null
