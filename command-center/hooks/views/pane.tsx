@@ -25,7 +25,7 @@ export const TABS: readonly Tab[] = ['now', 'sessions', 'prs', 'files', 'impact'
 export const CC = {
   name: 'cc',
   description: 'Command Center: this session, all sessions, PRs, files, impact',
-  argumentHint: '[now|sessions|prs|files|impact|refresh|skin on|skin off]',
+  argumentHint: '[now|sessions|prs|files|impact|standup [days]|refresh|skin on|skin off]',
   immediate: true,
 } as const
 

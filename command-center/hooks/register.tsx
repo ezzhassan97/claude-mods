@@ -11,7 +11,7 @@ import { stepsOnTurnComplete, stepsOnTurnStart } from './features/next'
 import { prsOnStart } from './features/prs'
 import { receiptDecorate, receiptOnTurnStart } from './features/receipt'
 import { skinRow } from './features/skin'
-import { report, STANDUP } from './features/standup'
+import { report } from './features/standup'
 import { config, configure } from './lib/config'
 import type { Cells, Io } from './lib/io'
 import { bandView } from './views/band'
@@ -131,8 +131,8 @@ export const register: Register = (on, options) => {
   on('session.start', async ($, e, next) => {
     const result = await next(e)
     const io = makeIo($)
-    await $.command.register(CC)
-    await $.command.register(STANDUP)
+    // A name another plugin owns is refused; that must never stop the rest of start-up.
+    await $.command.register(CC).catch(error => $.ui.log(`command-center: /cc not registered: ${String(error)}`, { to: 'debug' }))
     await onStart(io)
     await prsOnStart(io)
     if (config.isAutoOpen && e.isInteractive) void openPane(io)
@@ -187,11 +187,10 @@ export const register: Register = (on, options) => {
     return ran
   })
 
-  on('command.run', { command: 'cc' }, async ($, e) => ({ text: await ccCommand(makeIo($), e.args) }))
-
-  on('command.run', { command: 'standup' }, async ($, e) => {
-    const days = Math.max(1, Math.min(30, Number(e.args.trim()) || 1))
-    return { text: await report(makeIo($), days, config.workspace) }
+  on('command.run', { command: 'cc' }, async ($, e) => {
+    const [word = '', arg = ''] = e.args.trim().split(/\s+/)
+    if (word === 'standup') return { text: await report(makeIo($), Math.max(1, Math.min(30, Number(arg) || 1)), config.workspace) }
+    return { text: await ccCommand(makeIo($), e.args) }
   })
 
   on('ui.render', { component: 'AbovePrompt' }, async ($, e, next) => {

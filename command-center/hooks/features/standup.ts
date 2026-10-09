@@ -3,11 +3,9 @@ import { basename, clean, ticketKey } from '../lib/fmt'
 import { git } from '../lib/io'
 import type { Io } from '../lib/io'
 
-// /standup [days]: what you did since yesterday (or N days) across every git
+// /cc standup [days]: what you did since yesterday (or N days) across every git
 // repo in your workspace — commits grouped by repo and ticket — plus your PRs
 // (merged, waiting, needing changes) and the sessions still in flight.
-
-export const STANDUP = { name: 'standup', description: 'Your standup: commits, PRs and live sessions across all projects', argumentHint: '[days]' }
 
 export async function report(io: Io, days: number, workspace: string): Promise<string> {
   const home = await io.home()

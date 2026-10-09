@@ -6,5 +6,5 @@
     "noEmit": true, "skipLibCheck": true,
     "jsx": "react", "jsxFactory": "h", "jsxFragmentFactory": "Fragment"
   },
-  "include": ["command-center/.claude-plugin/types/claude-code/index.d.ts", "command-center/.claude-plugin/types/claude-code-tools/index.d.ts", "command-center/hooks", "command-center/types", "command-center/tests", "ims/hooks", "ims/types", "ims/tests"]
+  "include": [".types/claude-code.d.ts", "command-center/hooks", "command-center/types", "command-center/tests", "ims/hooks", "ims/types", "ims/tests"]
 }
