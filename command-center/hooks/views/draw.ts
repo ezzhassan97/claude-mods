@@ -278,7 +278,8 @@ export function drawJira(t: Ticket, w: number, now: number): string {
     c.progress(done / t.requirements.length, done === t.requirements.length ? INK.green : INK.clay, 4)
     for (const r of t.requirements.slice(0, 10)) {
       const mark = r.state === 'tested' ? { g: '✓', c: INK.green } : r.state === 'done' ? { g: '✓', c: INK.clay } : r.state === 'waived' ? { g: '~', c: INK.gray } : { g: '○', c: INK.gray }
-      c.line([{ t: mark.g, color: mark.c, size: 12, bold: true }, { t: r.text, size: 12, cls: r.state === 'open' ? 't' : 's', grow: true }], r.state !== 'open' ? [{ t: r.state, color: mark.c, size: 10.5 }] : [], 19)
+      // wraps to a second line instead of cutting the requirement off; the dot's colour is its state
+      c.text(r.state === 'open' ? r.text : `${r.text} · ${r.state}`, { size: 12, cls: r.state === 'open' ? 't' : 's', lines: 2, bullet: mark.c })
     }
   }
   const bugs = t.subs.filter(s => s.kind === 'bug')
@@ -287,8 +288,11 @@ export function drawJira(t: Ticket, w: number, now: number): string {
     c.space(4).label('Bugs', `${open.length} open of ${bugs.length}`, open.length ? INK.red : undefined)
     for (const b of open.slice(0, 6)) c.line([{ t: b.key, color: INK.red, size: 11.5, bold: true }, { t: b.summary, size: 12, grow: true }], [{ t: b.status, cls: 'm', size: 11 }], 19)
   }
-  const flow = t.subs.filter(s => s.kind === 'review' || s.kind === 'testing')
-  if (flow.length) c.line(flow.map(s => ({ t: `${s.kind === 'review' ? 'Code review' : 'Testing'} ${s.isDone ? '✓' : '○'}`, cls: s.isDone ? 't' : 'm', size: 11.5, gap: 14 }) as Seg), [], 20)
+  const flow = t.subs.filter(s => s.kind !== 'bug')
+  if (flow.length) {
+    c.space(4).label('Sub-tasks', `${flow.filter(f => f.isDone).length} of ${flow.length} done`)
+    for (const f of flow.slice(0, 6)) c.line([{ dot: f.isDone ? INK.green : INK.gray }, { t: f.key, cls: 's', size: 11.5, mono: true }, { t: f.summary, size: 12, cls: f.isDone ? 's' : 't', grow: true }], [{ t: f.status, pill: f.isDone ? INK.green : INK.gray, size: 10.5 }], 21)
+  }
   const last = t.comments[t.comments.length - 1]
   if (last) {
     c.space(4).label('Latest comment', `${plural(t.comments.length, 'comment')}`)
