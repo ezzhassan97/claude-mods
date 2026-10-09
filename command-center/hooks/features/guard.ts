@@ -21,7 +21,7 @@ const RULES: Rule[] = [
   { id: 'branch-delete', label: 'Delete branch', test: s => /^git\b.*\bbranch\b.*\s-D\b/.test(s) || /^git\b.*\bpush\b.*(\s--delete\b|\s:[^\s:]+)/.test(s) },
   { id: 'pr-merge', label: 'Merge a PR', test: s => /^gh\b.*\bpr\s+merge\b/.test(s) || /^gh\s+api\b.*\/merges?\b/.test(s) },
   { id: 'rm-rf', label: 'Recursive delete', test: s => /^rm\s/.test(s) && /(\s-[a-zA-Z]*(r[a-zA-Z]*f|f[a-zA-Z]*r)|\s--recursive\b)/.test(s) },
-  { id: 'sql', label: 'Destructive SQL', test: s => /\b(drop\s+(table|database|schema)|truncate\s+(table\s+)?\w)/i.test(s) },
+  { id: 'sql', label: 'Destructive SQL', test: s => /^(mysql|mariadb|mysqlsh|psql|sqlite3|mongosh)\b/.test(s) && /\b(drop\s+(table|database|schema)|truncate\s+(table\s+)?\w)/i.test(s) },
 ]
 
 const NEVER: { label: string; test: (segment: string) => boolean }[] = [
@@ -160,17 +160,22 @@ function dirFor(command: string, segment: string, cwd: string): string {
 }
 
 /** Hold the command on a card until the person answers (10 min at most). */
+// The answer travels in a plain variable: every state read inside one hook sees
+// the moment the hook started, so a held hook never sees the button's state write.
+let pressed: Held['decision'] = null
+
 async function hold(io: Io, held: Held, isAborted: () => boolean): Promise<'run' | 'cancel'> {
+  pressed = null
   await io.s.held.set(() => held)
   const started = await io.now()
-  let decision: Held['decision'] = null
-  while (!decision) {
+  while (!pressed) {
     if (isAborted() || (await io.now()) - started > 10 * 60_000) break
     await io.pause(250)
-    decision = (await io.s.held.get())?.decision ?? null
   }
+  const decision = pressed ?? 'cancel'
+  pressed = null
   await io.s.held.set(() => null)
-  return decision ?? 'cancel'
+  return decision
 }
 
 export async function guardCommand(io: Io, command: string, opts: { cwd: string; imsRoot: string; dbMode: 'staging' | 'local' | null; isOn: boolean; isAborted: () => boolean }): Promise<{ deny: string } | null> {
@@ -195,5 +200,6 @@ export async function guardCommand(io: Io, command: string, opts: { cwd: string;
 }
 
 export async function decide(io: Io, decision: 'run' | 'cancel'): Promise<void> {
+  pressed = decision
   await io.s.held.set(h => (h ? { ...h, decision } : h))
 }

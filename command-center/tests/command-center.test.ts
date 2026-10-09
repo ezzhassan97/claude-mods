@@ -34,6 +34,9 @@ describe('guard', () => {
     expect(rule('git push --force origin main')).toBe('never:force-pushing main/master')
     expect(rule('git push --force origin feature/main-fix')).toBe('force-push')
     expect(rule('git status && npm test')).toBe(null)
+    expect(rule('mysql -e "DROP TABLE units"')).toBe('sql')
+    expect(rule('git commit -m "lines truncate so buttons stay; drop table names"')).toBe(null)
+    expect(rule("python3 - <<'EOF'\ns = 'drop table x'\nEOF")).toBe(null)
   })
 })
 

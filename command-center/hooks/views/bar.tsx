@@ -121,7 +121,7 @@ export async function bandView(io: Io, E: Table, surface: RenderSurface, props: 
           </Box>
         ) : (
           <Box key={`know-${after.turnId}`} columnGap={1} marginBottom={1}>
-            <Box flexShrink={1}><Text color="warning" wrap="truncate-end">{isLoading ? '💡 You should know · thinking…' : `💡 ${plural(after.know.length, 'thing')} to know · ${after.know[0]}`}</Text></Box>
+            <Box flexGrow={1} flexShrink={1} minWidth={0}><Text color="warning" wrap="truncate-end">{isLoading ? '💡 You should know · thinking…' : `💡 ${plural(after.know.length, 'thing')} to know · ${after.know[0]}`}</Text></Box>
             {isLoading ? null : <Button key="know-more" label="Tell me more" onPress={more} />}
             {isLoading ? null : <Button key="know-ok" plain dimColor label="Got it" onPress={close('know')} />}
           </Box>
@@ -145,7 +145,7 @@ export async function bandView(io: Io, E: Table, surface: RenderSurface, props: 
           </Box>
         ) : (
           <Box key={`replay-${after.turnId}`} columnGap={1} marginBottom={1}>
-            <Box flexShrink={1}><Text color="claude" wrap="truncate-end">{`▶ ${plural(turnEdits.length, 'edit')} ready to replay · ${dur(after.durationMs)}`}</Text></Box>
+            <Box flexGrow={1} flexShrink={1} minWidth={0}><Text color="claude" wrap="truncate-end">{`▶ ${plural(turnEdits.length, 'edit')} ready to replay · ${dur(after.durationMs)}`}</Text></Box>
             <Button key="replay-go" label="Replay" onPress={go} />
             <Button key="replay-close" plain dimColor label="Dismiss" onPress={close('replay')} />
           </Box>
