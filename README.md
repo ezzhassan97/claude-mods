@@ -1,60 +1,65 @@
 # ezz-mods
 
-Two Claude Code mods (plugins of function hooks) that turn a session into a development command center.
+One Claude Code mod, `command-center`: what each session is on, at a glance, in every project. Inside ims-nawy it also knows the worktrees, the environment and the repo's rules.
 
-| Pack | Loads in | What it adds |
-|---|---|---|
-| `command-center` | every project (user scope) | status band, next steps, the `/cc` pane (Now · Sessions · PRs · Files · Impact), guard, turn receipt, desktop tool icons, `/standup` |
-| `ims` | ims-nawy only (project scope) | IMS rules enforced on every command, tunnels/Redis/DB line, `/ims` pane (Stories · Worktrees · Checklist · UAT), Jira tickets into context, `requirements` and `uat_log` tools |
+## What you see
+
+**The bar** above the message box:
+- Line 1: the Jira ticket, its status and title, the worktree, which database it uses (or "tunnel down"), and progress (the story's requirements done).
+- One line per branch (frontend and backend in ims-nawy): branch name, commits on it, unpushed, uncommitted, and the PR's state (approved, changes requested, conflicts, new comments…).
+- Context, tokens and cost on the right.
+- **One button, "Open ▸"**, for the side panel.
+
+**The side panel**: one panel, with sections that fold:
+- **Overview**: context, tokens, cost and time; the ticket; each branch with its last commit; the worktree, its ports, the tunnels and the database; other sessions and which need you; "change worktree" when the guess is wrong.
+- **Agents**: each subagent, its type and model, tools, tokens, context, time.
+- **Files**: what Claude is doing right now, and every file touched, with lines added/removed and "used by N" (how many files import it).
+- **GitHub**: this session's PRs, with review state, comments, commits someone else pushed, how far behind the base and main, checks, conflicts (and which files), and the deploy after a merge. Your other PRs are folded underneath.
+- **Jira**: status, the requirements checklist, bugs, code review and testing sub-tasks, the latest comment.
+- **Vercel**: deployments of this branch, when there are any.
+- **Controls**: switches for Next actions, What you should know, Replay, Reflect, the guard, and the card after each task. They're remembered across sessions.
+
+**After each task**, a card shows:
+- how long it took, the tools used, lines changed and cost;
+- **what you should know**: risks, side effects, assumptions, decisions left to you;
+- **Replay**: step through each edit as a diff, in the panel;
+- up to three **next actions** (press 1–3 to put one in the prompt box).
+
+**Reflect**: when you correct Claude, a card offers to save it as a rule, for this project (its CLAUDE.md) or for all projects (~/.claude/CLAUDE.md).
+
+**Guard**: a risky command (force-push, hard reset, discard, git clean, branch delete, PR merge, rm -rf, destructive SQL) waits on a card. The card shows what it would delete or drop, with Run it / Cancel. In ims-nawy the repo's rules are enforced:
+- PRs go into staging only, Mazen is the only reviewer, and the description must be complete.
+- No merges, no merging staging into a branch, no pushes to shared branches.
+- The shared checkouts keep their branch.
+- GitHub calls carry the nawy account's token.
+- MySQL schema changes wait for a yes and say whether they hit staging or local.
+
+Commands: `/cc` (open or close the panel), `/cc refresh`, `/cc standup [days]`, `/replay`.
 
 ## Install
 
-Folder marketplace, so edits here go live with `/reload-plugins` (no reinstall):
+Installed from this folder, so edits go live with `/reload-plugins`:
 
 ```bash
 claude plugin marketplace add ~/Main/Personal/coding-projects/claude-mods/code
 claude plugin install command-center@ezz-mods --scope user
-cd ~/Main/Nawy/coding-projects/ims-nawy && claude plugin install ims@ezz-mods --scope project
 ```
 
-From GitHub once pushed: `/plugin install command-center --marketplace ezzhassan97/claude-mods`.
-
-## command-center
-
-**Band** (above the prompt, one line): `✻ branch ↑ahead ↓behind ±dirty · ctx ▰▰▱ 34% · $1.20 · ☑ 3/7 · ◐ 2 agents · PRs 3 ▲1 · ◆ 1 waiting  cc ▸`.
-After an answer, up to three **next steps** (press 1–3 to put one in the prompt box; Tab takes the first).
-
-**`/cc [now|sessions|prs|files|impact|refresh|skin on|off]`** opens the pane:
-
-- **Now** — project and branch, context/spend/limit meters, the task list, subagents (status, tools, tokens, time), what the guard held.
-- **Sessions** — every Claude Code session on this machine, any project: who needs you, who is working, cost and context of each.
-- **PRs** — every open PR (and merged this week) across all `gh` accounts: review state, new comments, commits someone else pushed, drift vs base and main, conflicts (and which files), checks, the deploy after a merge.
-- **Files** — what this session touched (read / edited / created, +/− lines, git status), or the full tree.
-- **Impact** — for each edited file, who imports it and from which modules; "measure branch" for a whole branch; "copy for PR" for the reviewer notes.
-
-**Guard** — force-push, hard reset, discard, git clean, branch delete, PR merge, rm -rf and destructive SQL wait for your answer in the native dialog, with what they would change. `rm -rf ~` and force-pushing main are refused.
-
-**Receipt** — one line under a working turn: `✻ 42s · 12 tools · 4 files +120 −30 · $0.31`.
-
-**`/standup [days]`** — commits across every repo in `~/Main`, PRs, and live sessions.
-
-Options (`/config` → command-center): budget, context warning, chime, and each feature on/off.
-
-## ims
-
-- **Rules**: PRs only into `staging` with `mazenfayez` as the only reviewer and a complete description; never merge, never merge `staging` in, never push shared branches, never switch the shared `frontend/`/`backend/` checkouts, GitHub calls carry the nawy token, MySQL schema changes ask first and say whether they hit staging or local.
-- **Band line**: `IMS · MySQL ● Mongo ● Redis ● · db staging · ◐ 2 running` with a fix button when a tunnel drops.
-- **`/ims [stories|worktrees|checklist|uat|refresh|story IMS-n|tunnels]`**.
-- **Tickets in context**: mention `IMS-2423` and the story is loaded for Claude once.
-- **Checklist / UAT**: the story's Requirements become a checklist Claude ticks via `requirements`; `/ims-end` is told what is open. During `/uat-start` verdicts are logged via `uat_log`; `/uat-end` gets the board.
+Jira lookups from the mod go through your permission rules (a mod can't approve its own calls). To allow the two read-only Jira lookups, add them to `permissions.allow` in `~/.claude/settings.json`.
 
 ## Develop
 
 ```bash
+npx -y tsx dev/preview.ts && dev/shot.sh /tmp/shots          # every drawing, sample data, light + dark screenshots
+npx -y tsx dev/probe.ts <ims-root> <transcript.jsonl> [jira.json]   # the real features on real repos and GitHub
 CC="$HOME/Library/Application Support/Claude/claude-code/<version>/<hash>/claude.app/Contents/MacOS/claude"
 "$CC" plugin validate command-center && "$CC" plugin test command-center
-"$CC" plugin validate ims && "$CC" plugin test ims
-npx -p typescript@5.6.3 tsc -p tsconfig.json
+npx -p typescript@5.6.3 tsc -p tsconfig.json                  # needs .types/claude-code.d.ts (the engine's API file)
 ```
 
-Engine rules that shape the code: `$` is used only in `hooks/register.tsx` (the engine follows `$` within one file), which builds an `io` door for features and views; state atoms are declared there too; each event has one unfiltered hook per module.
+Engine rules that shape the code:
+- `$` is used only in `hooks/register.tsx`, because the engine follows `$` within one file. That file builds the `io` door that features and views use.
+- State atoms are declared there too.
+- Each event has one hook without a matcher.
+- Desktop lines are each drawn as one SVG, because separate elements wrap.
+- A mod can't approve its own tool calls.

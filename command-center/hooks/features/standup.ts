@@ -37,7 +37,7 @@ export async function report(io: Io, days: number, workspace: string): Promise<s
     }
   }
 
-  const prs = (await io.s.prs.get()).items
+  const prs = (await io.s.github.get()).mine
   const merged = prs.filter(p => p.state === 'MERGED' && p.mergedAt && p.mergedAt >= sinceIso)
   const open = prs.filter(p => p.state === 'OPEN')
   const prLine = (p: (typeof prs)[number], tail: string): string => `- ${p.repo.split('/')[1]} #${p.number} ${p.title}${tail}`
@@ -49,6 +49,6 @@ export async function report(io: Io, days: number, workspace: string): Promise<s
   if (open.length) {
     out.push('', '**In review**', ...open.map(p => prLine(p, p.review === 'CHANGES_REQUESTED' ? ' — changes requested' : p.isDraft ? ' — draft' : p.review === 'APPROVED' ? ' — approved' : ' — waiting for review')))
   }
-  if (sessions.length) out.push('', '**In flight**', ...sessions.map(s => `- ${s.project}${s.branch ? ` (${s.branch})` : ''}: ${s.task ?? s.title}`))
+  if (sessions.length) out.push('', '**In flight**', ...sessions.map(s => `- ${s.project}${s.branch ? ` (${s.branch})` : ''}: ${s.ticket ? `${s.ticket} · ` : ""}${s.title}`))
   return out.join('\n')
 }

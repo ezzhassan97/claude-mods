@@ -1,28 +1,14 @@
-
-import type { CheckState, Pr, Prs } from '../../types'
-import { config } from '../lib/config'
+import type { CheckState, Deploy, Github, Pr } from '../../types'
 import { clean, ticketKey } from '../lib/fmt'
-import { gh, ghAccounts, git, json } from '../lib/io'
+import { accountFor, gh, ghAccounts, git, json } from '../lib/io'
 import type { GhAccount, Io } from '../lib/io'
-import { me } from './live'
 
-// Pull requests across every GitHub account `gh` is logged into: the open
-// ones plus those merged in the last week. Per PR: review state, comments
-// (and how many are new since you last looked), commits pushed by someone
-// else (the tech lead's fixes), drift from its base and from the default
-// branch, mergeability, checks, and after a merge the base branch's deploy.
-// Read-only: every call is a GET; conflicts are checked with `git merge-tree`,
-// which writes no branch and touches no working tree.
-
-const REFRESH_MS = 5 * 60_000
-const MERGED_DAYS = 7
-
-export const attention = (p: Pr): boolean =>
-  p.state === 'OPEN'
-    ? p.review === 'CHANGES_REQUESTED' || p.mergeable === 'CONFLICTING' || p.checks === 'fail' || p.newComments > 0
-    : p.state === 'MERGED' && p.deploy?.conclusion === 'failure'
-
-type SearchHit = { url: string; number: number; title: string; isDraft: boolean; updatedAt: string; repository: { nameWithOwner: string } }
+// GitHub for this session: the PR of each branch it works on (review state,
+// comments and how many are new, commits someone else pushed, drift from its
+// base and from the default branch, mergeability, checks, the deploy after a
+// merge), the deployments of those branches (Vercel and the like), and your
+// other PRs across every `gh` account. Read-only: every call is a GET, and
+// conflicts are checked with `git merge-tree`, which writes no branch.
 
 type View = {
   number: number
@@ -45,9 +31,10 @@ type View = {
   deletions: number
   changedFiles: number
   updatedAt: string
+  url: string
 }
 
-const FIELDS = 'number,title,state,isDraft,baseRefName,headRefName,headRepositoryOwner,mergeable,reviewDecision,latestReviews,reviewRequests,comments,commits,statusCheckRollup,mergedAt,mergedBy,additions,deletions,changedFiles,updatedAt'
+const FIELDS = 'number,title,state,isDraft,baseRefName,headRefName,headRepositoryOwner,mergeable,reviewDecision,latestReviews,reviewRequests,comments,commits,statusCheckRollup,mergedAt,mergedBy,additions,deletions,changedFiles,updatedAt,url'
 
 function checks(rollup: View['statusCheckRollup']): CheckState {
   if (!rollup?.length) return 'none'
@@ -68,16 +55,12 @@ async function defaultBranch(io: Io, account: GhAccount, repo: string): Promise<
   return branch
 }
 
-async function detail(io: Io, account: GhAccount, hit: SearchHit, seen: Record<string, number>): Promise<Pr | null> {
-  const repo = hit.repository.nameWithOwner
-  const viewRun = await gh(io, account, ['pr', 'view', hit.url, '--json', FIELDS])
+async function detail(io: Io, account: GhAccount, repo: string, ref: string, seen: Record<string, number>): Promise<Pr | null> {
+  const viewRun = await gh(io, account, ['pr', 'view', ref, '--repo', repo, '--json', FIELDS])
   const v = viewRun.ok ? json<View>(viewRun.out) : null
   if (!v) return null
   const owner = v.headRepositoryOwner?.login ?? repo.split('/')[0] ?? ''
-  const [inline, main] = await Promise.all([
-    gh(io, account, ['api', `repos/${repo}/pulls/${v.number}/comments`, '--jq', 'length']),
-    defaultBranch(io, account, repo),
-  ])
+  const [inline, main] = await Promise.all([gh(io, account, ['api', `repos/${repo}/pulls/${v.number}/comments`, '--jq', 'length']), defaultBranch(io, account, repo)])
   const reviewBodies = v.latestReviews.filter(r => r.body?.trim())
   const comments = v.comments.length + Number(inline.out || 0) + reviewBodies.length
   const talk = [
@@ -85,13 +68,8 @@ async function detail(io: Io, account: GhAccount, hit: SearchHit, seen: Record<s
     ...reviewBodies.map(r => ({ author: r.author.login, text: `${r.state.toLowerCase().replace('_', ' ')}: ${r.body}`, at: r.submittedAt })),
   ].sort((a, b) => b.at.localeCompare(a.at))
   const last = talk[0]
-
   const others = new Map<string, number>()
-  for (const commit of v.commits) {
-    for (const author of commit.authors) {
-      if (author.login && author.login !== account.user) others.set(author.login, (others.get(author.login) ?? 0) + 1)
-    }
-  }
+  for (const commit of v.commits) for (const author of commit.authors) if (author.login && author.login !== account.user) others.set(author.login, (others.get(author.login) ?? 0) + 1)
 
   let vsBase: Pr['vsBase'] = null
   let vsMain: Pr['vsMain'] = null
@@ -100,9 +78,7 @@ async function detail(io: Io, account: GhAccount, hit: SearchHit, seen: Record<s
     const head = `${owner}:${v.headRefName}`
     const [base, fromMain] = await Promise.all([
       gh(io, account, ['api', `repos/${repo}/compare/${encodeURIComponent(v.baseRefName)}...${encodeURIComponent(head)}`, '--jq', '[.ahead_by,.behind_by]']),
-      v.baseRefName === main
-        ? Promise.resolve(null)
-        : gh(io, account, ['api', `repos/${repo}/compare/${encodeURIComponent(main)}...${encodeURIComponent(head)}`, '--jq', '[.behind_by,.merge_base_commit.commit.committer.date]']),
+      v.baseRefName === main ? Promise.resolve(null) : gh(io, account, ['api', `repos/${repo}/compare/${encodeURIComponent(main)}...${encodeURIComponent(head)}`, '--jq', '[.behind_by,.merge_base_commit.commit.committer.date]']),
     ])
     const b = json<[number, number]>(base.out)
     if (b) vsBase = { ahead: b[0], behind: b[1] }
@@ -110,14 +86,13 @@ async function detail(io: Io, account: GhAccount, hit: SearchHit, seen: Record<s
     if (m) vsMain = { behind: m[0], forkedAt: m[1] }
   } else if (v.state === 'MERGED' && v.mergedAt) {
     const runs = await gh(io, account, ['run', 'list', '--repo', repo, '--branch', v.baseRefName, '--limit', '8', '--json', 'status,conclusion,createdAt,workflowName,url,event'])
-    const list = json<{ status: string; conclusion: string; createdAt: string; workflowName: string; url: string; event: string }[]>(runs.out) ?? []
-    const after = list.filter(r => r.createdAt >= v.mergedAt! && r.event === 'push').sort((a, b) => a.createdAt.localeCompare(b.createdAt))[0]
+    const after = (json<{ status: string; conclusion: string; createdAt: string; workflowName: string; url: string; event: string }[]>(runs.out) ?? [])
+      .filter(r => r.createdAt >= v.mergedAt! && r.event === 'push')
+      .sort((a, b) => a.createdAt.localeCompare(b.createdAt))[0]
     if (after) deploy = { status: after.status, conclusion: after.conclusion || null, workflow: clean(after.workflowName, 40), url: after.url }
   }
-
-  const url = hit.url
   return {
-    url,
+    url: v.url,
     repo,
     number: v.number,
     title: clean(v.title, 140),
@@ -132,8 +107,8 @@ async function detail(io: Io, account: GhAccount, hit: SearchHit, seen: Record<s
     mergeable: v.mergeable || null,
     checks: checks(v.statusCheckRollup),
     comments,
-    newComments: Math.max(0, comments - (seen[url] ?? comments)),
-    lastComment: last ? { author: last.author, text: clean(last.text, 160), at: last.at } : null,
+    newComments: Math.max(0, comments - (seen[v.url] ?? comments)),
+    lastComment: last ? { author: last.author, text: clean(last.text, 200), at: last.at } : null,
     othersCommits: [...others].map(([author, count]) => ({ author, count })),
     vsBase,
     vsMain,
@@ -148,117 +123,106 @@ async function detail(io: Io, account: GhAccount, hit: SearchHit, seen: Record<s
   }
 }
 
+async function deploysOf(io: Io, account: GhAccount, repo: string, ref: string): Promise<Deploy[]> {
+  const r = await gh(io, account, ['api', `repos/${repo}/deployments?ref=${encodeURIComponent(ref)}&per_page=2`])
+  const list = json<{ id: number; environment: string; created_at: string; ref: string }[]>(r.out) ?? []
+  const out: Deploy[] = []
+  for (const d of list) {
+    const s = await gh(io, account, ['api', `repos/${repo}/deployments/${d.id}/statuses?per_page=1`])
+    const status = json<{ state: string; environment_url?: string; target_url?: string; created_at: string }[]>(s.out)?.[0]
+    out.push({ repo, ref: d.ref, environment: clean(d.environment, 40), state: status?.state ?? 'pending', url: status?.environment_url || status?.target_url || null, at: status?.created_at ?? d.created_at })
+  }
+  return out
+}
+
 let isFetching = false
 
-export async function refreshPrs(io: Io): Promise<void> {
+/** This session's PRs and deployments, by the branches it works on. */
+export async function refreshFocusPrs(io: Io): Promise<void> {
   if (isFetching) return
   isFetching = true
-  await io.s.prs.set(p => ({ ...p, isLoading: true }))
   try {
-    const accounts = await ghAccounts(io)
-    if (!accounts.length) {
-      await io.s.prs.set(p => ({ ...p, isLoading: false, error: 'gh is not logged in (run: gh auth login)' }))
-      return
-    }
-    const now = await io.now()
-    const since = new Date(now - MERGED_DAYS * 86400_000).toISOString().slice(0, 10)
+    const focus = await io.s.focus.get()
     const seen = ((await io.storeGet('seen')) as Record<string, number> | undefined) ?? {}
-    const search = ['--author', '@me', '--json', 'url,number,title,isDraft,updatedAt,repository', '--limit', '30']
-    const found = await Promise.all(
-      accounts.map(async account => {
-        const [open, merged] = await Promise.all([
-          gh(io, account, ['search', 'prs', '--state', 'open', ...search]),
-          gh(io, account, ['search', 'prs', '--merged', '--merged-at', `>=${since}`, ...search]),
-        ])
-        const hits = [...(json<SearchHit[]>(open.out) ?? []), ...(json<SearchHit[]>(merged.out) ?? [])]
-        return hits.map(hit => ({ account, hit }))
-      }),
-    )
-    const unique = new Map<string, { account: GhAccount; hit: SearchHit }>()
-    for (const one of found.flat()) unique.set(one.hit.url, one)
-
-    const items: Pr[] = []
-    const queue = [...unique.values()]
-    // ponytail: 6 at a time keeps GitHub's secondary rate limit happy; raise if it's slow.
-    for (let i = 0; i < queue.length; i += 6) {
-      const batch = await Promise.all(queue.slice(i, i + 6).map(({ account, hit }) => detail(io, account, hit, seen)))
-      for (const pr of batch) if (pr) items.push(pr)
-    }
-    const old = await io.s.prs.get()
-    for (const pr of items) pr.conflictFiles = old.items.find(o => o.url === pr.url)?.conflictFiles ?? null
-    const rank = (p: Pr): number => (attention(p) ? 0 : p.state === 'OPEN' ? (p.isDraft ? 2 : 1) : 3)
-    items.sort((a, b) => rank(a) - rank(b) || b.updatedAt.localeCompare(a.updatedAt))
-    // A PR seen for the first time starts as "read".
-    let isSeenChanged = false
-    for (const pr of items) {
-      if (seen[pr.url] === undefined) {
-        seen[pr.url] = pr.comments
-        isSeenChanged = true
+    const prs: Pr[] = []
+    const deploys: Deploy[] = []
+    for (const b of focus?.branches ?? []) {
+      if (!b.remote || !b.branch) continue
+      const account = await accountFor(io, b.remote)
+      if (!account) continue
+      const list = await gh(io, account, ['pr', 'list', '--repo', b.remote, '--head', b.branch, '--state', 'all', '--limit', '1', '--json', 'number'])
+      const n = json<{ number: number }[]>(list.out)?.[0]?.number
+      if (n) {
+        const pr = await detail(io, account, b.remote, String(n), seen)
+        if (pr) prs.push(pr)
       }
+      deploys.push(...(await deploysOf(io, account, b.remote, b.branch)))
     }
-    if (isSeenChanged) await io.storeSet('seen', seen)
-    const done = { items, at: await io.now(), isLoading: false, error: null }
-    await io.s.prs.set(() => done)
-    await io.storeSet('prs', done)
+    for (const pr of prs) if (seen[pr.url] === undefined) seen[pr.url] = pr.comments
+    await io.storeSet('seen', seen)
+    const old = await io.s.github.get()
+    for (const pr of prs) pr.conflictFiles = old.focus.find(o => o.url === pr.url)?.conflictFiles ?? null
+    const at = await io.now()
+    await io.s.github.set(g => ({ ...g, focus: prs, deploys, at, error: null }))
   } catch (error) {
-    await io.s.prs.set(p => ({ ...p, isLoading: false, error: clean(String(error), 160) }))
+    await io.s.github.set(g => ({ ...g, error: clean(String(error), 160) }))
   } finally {
     isFetching = false
   }
 }
 
-/** Mark a PR's comments as read. */
+/** Every open PR you authored (and those merged this week), across all accounts. */
+export async function refreshMine(io: Io): Promise<void> {
+  await io.s.github.set(g => ({ ...g, isLoading: true }))
+  try {
+    const now = await io.now()
+    const since = new Date(now - 7 * 86400_000).toISOString().slice(0, 10)
+    const fields = ['--author', '@me', '--json', 'url,number,repository', '--limit', '25']
+    const seen = ((await io.storeGet('seen')) as Record<string, number> | undefined) ?? {}
+    const hits: { account: GhAccount; repo: string; number: number }[] = []
+    for (const account of await ghAccounts(io)) {
+      for (const state of [['--state', 'open'], ['--merged', '--merged-at', `>=${since}`]]) {
+        const r = await gh(io, account, ['search', 'prs', ...state, ...fields])
+        for (const h of json<{ number: number; repository: { nameWithOwner: string } }[]>(r.out) ?? []) hits.push({ account, repo: h.repository.nameWithOwner, number: h.number })
+      }
+    }
+    const mine: Pr[] = []
+    for (let i = 0; i < hits.length; i += 6) {
+      const batch = await Promise.all(hits.slice(i, i + 6).map(h => detail(io, h.account, h.repo, String(h.number), seen)))
+      for (const pr of batch) if (pr) mine.push(pr)
+    }
+    const rank = (p: Pr): number => (p.state !== 'OPEN' ? 3 : p.review === 'CHANGES_REQUESTED' || p.mergeable === 'CONFLICTING' || p.newComments ? 0 : p.isDraft ? 2 : 1)
+    mine.sort((a, b) => rank(a) - rank(b) || b.updatedAt.localeCompare(a.updatedAt))
+    await io.s.github.set(g => ({ ...g, mine, isLoading: false, at: now }))
+    await io.storeSet('mine', mine)
+  } catch (error) {
+    await io.s.github.set(g => ({ ...g, isLoading: false, error: clean(String(error), 160) }))
+  }
+}
+
 export async function markSeen(io: Io, url: string): Promise<void> {
-  const prs = await io.s.prs.get()
-  const pr = prs.items.find(p => p.url === url)
+  const g: Github = await io.s.github.get()
+  const pr = [...g.focus, ...g.mine].find(p => p.url === url)
   if (!pr) return
   const seen = ((await io.storeGet('seen')) as Record<string, number> | undefined) ?? {}
   seen[url] = pr.comments
   await io.storeSet('seen', seen)
-  await io.s.prs.set(p => ({ ...p, items: p.items.map(i => (i.url === url ? { ...i, newComments: 0 } : i)) }))
+  const clear = (list: Pr[]): Pr[] => list.map(p => (p.url === url ? { ...p, newComments: 0 } : p))
+  await io.s.github.set(x => ({ ...x, focus: clear(x.focus), mine: clear(x.mine) }))
 }
 
-/** Which files would conflict if the PR merged now — via a local clone, read-only. */
+/** Which files would conflict if the PR merged now, from the session's own copy. */
 export async function checkConflicts(io: Io, url: string): Promise<void> {
-  const prs = await io.s.prs.get()
-  const pr = prs.items.find(p => p.url === url)
-  if (!pr) return
-  const account = (await ghAccounts(io)).find(a => a.user === pr.account)
-  const clone = await findClone(io, pr.repo)
-  if (!clone || !account) {
-    io.toast(`No local clone of ${pr.repo} found near this session`)
-    return
-  }
-  io.toast(`Checking ${pr.repo}#${pr.number} against ${pr.base}…`)
-  const fetched = await io.run(['git', '-C', clone, 'fetch', '--quiet', 'origin', pr.base, pr.head], { env: { GH_TOKEN: account.token }, timeoutMs: 60_000 })
-  if (!fetched.ok) {
-    io.toast(`git fetch failed: ${clean(fetched.err, 100)}`)
-    return
-  }
-  const merged = await git(io, clone, 'merge-tree', '--write-tree', '--name-only', '--no-messages', `origin/${pr.base}`, `origin/${pr.head}`)
+  const g = await io.s.github.get()
+  const pr = g.focus.find(p => p.url === url)
+  const focus = await io.s.focus.get()
+  const copy = focus?.branches.find(b => b.remote?.toLowerCase() === pr?.repo.toLowerCase())
+  const account = pr ? await accountFor(io, pr.repo) : null
+  if (!pr || !copy || !account) return
+  io.toast(`Checking ${pr.repo.split('/')[1]} #${pr.number} against ${pr.base}…`)
+  const fetched = await io.run(['git', '-C', copy.root, 'fetch', '--quiet', 'origin', pr.base, pr.head], { env: { GH_TOKEN: account.token }, timeoutMs: 60_000 })
+  if (!fetched.ok) return io.toast(`git fetch failed: ${clean(fetched.err, 100)}`)
+  const merged = await git(io, copy.root, 'merge-tree', '--write-tree', '--name-only', '--no-messages', `origin/${pr.base}`, `origin/${pr.head}`)
   const files = merged.code === 1 ? merged.out.split('\n').slice(1).filter(Boolean) : []
-  await io.s.prs.set(p => ({ ...p, items: p.items.map(i => (i.url === url ? { ...i, conflictFiles: files } : i)) }))
-  io.toast(files.length ? `${files.length} file(s) conflict with ${pr.base}` : `No conflicts with ${pr.base}`)
-}
-
-async function findClone(io: Io, repo: string): Promise<string | null> {
-  const candidates = new Set<string>()
-  const top = await git(io, me.root, 'rev-parse', '--show-toplevel')
-  if (top.ok) candidates.add(top.out)
-  for (const entry of await io.list(me.root).catch(() => [])) {
-    if (entry.kind === 'dir' && !entry.name.startsWith('.')) candidates.add(`${me.root}/${entry.name}`)
-  }
-  for (const dir of candidates) {
-    const remote = await git(io, dir, 'remote', 'get-url', 'origin')
-    if (remote.ok && remote.out.replace(/\.git$/, '').toLowerCase().endsWith(repo.toLowerCase())) return dir
-  }
-  return null
-}
-
-export async function prsOnStart(io: Io): Promise<void> {
-  if (!config.isTrackingPrs) return
-  const cached = (await io.storeGet('prs')) as Prs | undefined
-  if (Array.isArray(cached?.items)) await io.s.prs.set(() => ({ ...cached, isLoading: false, error: null }))
-  void refreshPrs(io)
-  io.every(REFRESH_MS, () => void refreshPrs(io))
+  await io.s.github.set(x => ({ ...x, focus: x.focus.map(p => (p.url === url ? { ...p, conflictFiles: files } : p)) }))
 }

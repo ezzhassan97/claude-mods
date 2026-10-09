@@ -4,3 +4,5 @@ node_modules/
 */.claude-plugin/types/
 tsconfig.tsbuildinfo
 .types/
+dev/preview.html
+dev/node_modules/

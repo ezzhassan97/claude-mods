@@ -1,22 +1,9 @@
 {
   "name": "command-center",
-  "version": "0.1.0",
-  "description": "A development cockpit for any project: live status band, next-step suggestions, a pane for this session, all sessions, PRs, files and change impact, a guard for risky commands, turn receipts and a desktop skin.",
-  "author": { "name": "Ezz Hassan" },
-  "types": "./types/index.d.ts",
-  "userConfig": {
-    "budget_usd": { "type": "number", "title": "Session budget (USD)", "description": "Cost meter and warnings at 50%, 80% and 100% of this. 0 turns the budget off.", "default": 10 },
-    "context_alert_pct": { "type": "number", "title": "Context warning (%)", "description": "Warn once when the context window passes this.", "default": 85 },
-    "sound": { "type": "boolean", "title": "Chime when a session needs you", "description": "Soft chime on a permission prompt or a question.", "default": true },
-    "guard": { "type": "boolean", "title": "Guard risky commands", "description": "Hold force-pushes, hard resets, rm -rf, PR merges and the like until you confirm.", "default": true },
-    "next_steps": { "type": "boolean", "title": "Suggest next steps", "description": "After a turn, up to three likely next prompts above the prompt box (costs about one short reply).", "default": true },
-    "receipt": { "type": "boolean", "title": "Turn receipt", "description": "One dim line under an answer: time, tools, lines changed, cost.", "default": true },
-    "skin": { "type": "boolean", "title": "Desktop tool icons", "description": "Outlined icons beside tool rows in the desktop app.", "default": true },
-    "band": { "type": "boolean", "title": "Status band", "description": "The one-line status above the prompt.", "default": true },
-    "prs": { "type": "boolean", "title": "Track pull requests", "description": "Your PRs across every gh account, refreshed every 5 minutes.", "default": true },
-    "impact": { "type": "boolean", "title": "Impact of edits", "description": "Which files depend on each file Claude edits.", "default": true },
-    "impact_warn": { "type": "number", "title": "Shared-file warning", "description": "Warn when an edited file has at least this many dependents.", "default": 8 },
-    "auto_open": { "type": "boolean", "title": "Open the pane at start", "description": "Open the Command Center pane when a session starts.", "default": false },
-    "workspace": { "type": "string", "title": "Workspace folder", "description": "Where /standup looks for git repos.", "default": "~/Main" }
-  }
+  "version": "0.2.0",
+  "description": "What this session is on, at a glance, in any project: a bar above the prompt (ticket, branches and commits, worktree, environment, PRs, progress, usage), one side panel (overview, agents, files, GitHub, Jira, Vercel, controls), a card after each task (replay, what you should know, next actions), reflect, and a guard for risky commands. Enforces ims-nawy's rules inside ims-nawy.",
+  "author": {
+    "name": "Ezz Hassan"
+  },
+  "types": "./types/index.d.ts"
 }

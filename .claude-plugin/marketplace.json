@@ -1,6 +1,6 @@
 {
   "name": "ezz-mods",
-  "description": "Ezz's Claude Code mods: a development command center for any project, and the IMS pack for ims-nawy.",
+  "description": "Ezz's Claude Code mods: a command center for every session, with ims-nawy's rules built in.",
   "owner": {
     "name": "Ezz Hassan"
   },
@@ -8,12 +8,7 @@
     {
       "name": "command-center",
       "source": "./command-center",
-      "description": "A development cockpit for any project: status band, next steps, sessions, agents, PRs, files, impact, a guard for risky commands, turn receipts and a desktop skin."
-    },
-    {
-      "name": "ims",
-      "source": "./ims",
-      "description": "The IMS (ims-nawy) pack: repo rules enforced, tunnels and DB on screen, stories with PRs and bugs, tickets in context, requirements checklist and UAT board."
+      "description": "What this session is on, at a glance: the bar, one side panel, replay, what you should know, next actions, reflect and a guard. Enforces ims-nawy's rules inside ims-nawy."
     }
   ]
 }
