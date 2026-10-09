@@ -38,7 +38,7 @@ export async function sessionStart(io: Io): Promise<void> {
   me.dir = `${me.home}/.claude/command-center/sessions`
   me.startedAt = (await io.usage())?.startedAt ?? (await io.now())
   const history = await io.messages().catch(() => [])
-  const asked = history.filter(m => m.role === 'user' && m.text.trim() && !m.text.startsWith('/') && !m.text.startsWith('<'))
+  const asked = history.filter(m => m.role === 'user' && isTyped(m.text))
   if (asked[0]) me.title = clean(asked[0].text, 80)
   if (asked.length) me.lastPrompt = clean(asked[asked.length - 1]!.text, 160)
   await io.run(['mkdir', '-p', me.dir])
@@ -80,9 +80,13 @@ export async function setStatus(io: Io, status: Status, waitingFor: string | nul
   void beat(io)
 }
 
+/** A prompt the person typed: not a command, a system note or "[Request interrupted…]". */
+const isTyped = (text: string): boolean => !!text.trim() && !/^\s*[/<[]/.test(text)
+
 export function prompted(text: string): void {
+  if (!isTyped(text)) return
   me.lastPrompt = clean(text, 160)
-  if (!me.title && text.trim() && !text.startsWith('/')) me.title = clean(text, 80)
+  if (!me.title) me.title = clean(text, 80)
 }
 
 export async function turnStarted(io: Io, turnId: string): Promise<void> {
@@ -212,6 +216,7 @@ export async function beat(io: Io, extra: { project?: string; branch?: string | 
   const mine: Beat = {
     id: me.id,
     project: extra.project ?? basename(me.root),
+    root: me.root,
     branch: extra.branch ?? null,
     ticket: extra.ticket ?? null,
     title: me.lastPrompt || me.title || 'New session',

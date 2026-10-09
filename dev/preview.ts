@@ -4,7 +4,7 @@
 import { writeFileSync } from 'node:fs'
 
 import type { After, Agent, Beat, Edit, Env, Focus, Github, Pr, Rule, Ticket, Touch, Usage } from '../command-center/types'
-import { drawAgents, drawBar, drawDeploys, drawFiles, drawJira, drawKnow, drawNextHead, drawNextRow, drawOverview, drawPr, drawPrList, drawReplay, drawRule, drawTimeline, drawToggle } from '../command-center/hooks/views/draw'
+import { drawAgents, drawBar, drawDeploys, drawFiles, drawJira, drawKnow, drawNextHead, drawNextRow, drawOverview, drawPr, drawPrList, drawSessions, drawReplay, drawRule, drawToggle } from '../command-center/hooks/views/draw'
 import { CONTROLS } from '../command-center/hooks/features/controls'
 
 const now = Date.parse('2026-10-09T18:00:00Z')
@@ -66,10 +66,10 @@ const touched: Touch[] = [
   { path: '/x/ims-nawy/.worktrees/masterplan-amenities-backend/src/compounds/compounds.service.ts', reads: 3, edits: 0, created: false, added: 0, removed: 0, at: now, dependents: null },
 ]
 const others: Beat[] = [
-  { id: 's2', project: 'ims-nawy', branch: 'IMS-2425-Developers-Whatsapp-Chats', ticket: 'IMS-2425', title: 'Developers WhatsApp chats', status: 'waiting', waitingFor: 'Approve: git push origin IMS-2425…', contextPct: 61, costUsd: 3.1, agents: 0, updatedAt: now },
-  { id: 's3', project: 'septem', branch: 'dev', ticket: null, title: 'Order product brief', status: 'idle', waitingFor: null, contextPct: 12, costUsd: 0.4, agents: 0, updatedAt: now - 14 * min },
+  { id: 's2', root: '/x/ims-nawy', project: 'ims-nawy', branch: 'IMS-2425-Developers-Whatsapp-Chats', ticket: 'IMS-2425', title: 'Developers WhatsApp chats', status: 'waiting', waitingFor: 'Approve: git push origin IMS-2425…', contextPct: 61, costUsd: 3.1, agents: 0, updatedAt: now },
+  { id: 's3', root: '/x/ims-nawy', project: 'septem', branch: 'dev', ticket: null, title: 'Order product brief', status: 'idle', waitingFor: null, contextPct: 12, costUsd: 0.4, agents: 0, updatedAt: now - 14 * min },
 ]
-const after: After = { turnId: 't', state: 'ready', durationMs: 42_000, tools: 12, files: ['a', 'b', 'c', 'd'], added: 120, removed: 30, costUsd: 0.31, edits: 4, know: ['The pin-drop link now writes to the shared staging DB — the 3 test amenities you dropped are real rows.', 'amenity.mapper.ts is used by 14 files in 4 modules; the PR note should say so.'], next: [{ label: 'Run the amenities tests', prompt: 'Run the amenities tests in the frontend worktree' }, { label: 'Open the PRs', prompt: '/ims-end masterplan-amenities' }, { label: 'Fix the overlapping counter bug', prompt: 'Fix IMS-2430: overlapping names hide the counter' }], dismissed: [] }
+const after: After = { turnId: 't', state: 'ready', anchor: '', durationMs: 42_000, tools: 12, files: ['a', 'b', 'c', 'd'], added: 120, removed: 30, costUsd: 0.31, edits: 4, know: ['The pin-drop link now writes to the shared staging DB — the 3 test amenities you dropped are real rows.', 'amenity.mapper.ts is used by 14 files in 4 modules; the PR note should say so.'], next: [{ label: 'Run the amenities tests', prompt: 'Run the amenities tests in the frontend worktree' }, { label: 'Open the PRs', prompt: '/ims-end masterplan-amenities' }, { label: 'Fix the overlapping counter bug', prompt: 'Fix IMS-2430: overlapping names hide the counter' }], dismissed: [] }
 const rule: Rule = { id: 1, rule: 'Use pnpm instead of npm for package management in this project.', quote: 'no - in this repo we always use pnpm, not npm', confidence: 0.95 }
 const edits: Edit[] = [
   { id: 1, turnId: 't', path: '/x/README.md', tool: 'Edit', before: '`greet(name)`', after: '`welcome(name)`', added: 1, removed: 1, at: now },
@@ -99,7 +99,7 @@ const blocks: [string, string][] = [
   ['Panel · your other PRs', drawPrList(github.mine, P)],
   ['Panel · Jira', drawJira(ticket, P, now)],
   ['Panel · Vercel', drawDeploys(github.deploys, P, now)],
-  ['Replay · timeline', drawTimeline(edits, 0, P, '/x')],
+  ['Panel · sessions', drawSessions(others, P, now)],
   ...CONTROLS.map((c, i) => [`Controls · ${c.key}`, drawToggle(c.name, c.what, i % 3 !== 1, P)] as [string, string]),
 ]
 

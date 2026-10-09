@@ -146,6 +146,8 @@ export type After = {
   edits: number
   know: string[]
   next: Suggestion[]
+  /** The end of the reply's text (whitespace squashed): the cards draw under the block it ends. */
+  anchor: string
   /** Cards of this turn the person closed. */
   dismissed: ('know' | 'next' | 'replay')[]
 }
@@ -159,12 +161,14 @@ export type Rule = { id: number; rule: string; quote: string; confidence: number
 /** `builtinKnow` is Anthropic's built-in mod (cc-plugin-you-should-know), the rest are this mod's. */
 export type Toggles = { next: boolean; know: boolean; builtinKnow: boolean; replay: boolean; reflect: boolean }
 
-export type Panel = { tab: string; replay: number | null; showAllPrs: boolean; isPicking: boolean }
+export type Panel = { tab: string; replay: number | null; replayLine: number; showAllPrs: boolean; isPicking: boolean }
 
 /** One Claude Code session, as its heartbeat file says (any project). */
 export type Beat = {
   id: string
   project: string
+  /** The folder the session was opened in. */
+  root: string
   branch: string | null
   ticket: string | null
   title: string

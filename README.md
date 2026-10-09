@@ -4,28 +4,28 @@ One Claude Code mod, `command-center`: what each session is on, at a glance, in 
 
 ## What you see
 
-**The bar** above the message box:
+**The bar** above the message box, and nothing else there:
 - Line 1: the Jira ticket, its status and title, the worktree, which database it uses (or "tunnel down"), and progress (the story's requirements done).
 - One line per branch (frontend and backend in ims-nawy): branch name, commits on it, unpushed, uncommitted, and the PR's state (approved, changes requested, conflicts, new comments…).
 - Context, tokens and cost on the right.
 - **One button, "Open ▸"**, for the side panel.
 
-**The side panel**: one panel, with sections that fold:
-- **Overview**: context, tokens, cost and time; the ticket; each branch with its last commit; the worktree, its ports, the tunnels and the database; other sessions and which need you; "change worktree" when the guess is wrong.
+**The side panel**: one panel, with tabs:
+- **Overview**: context, tokens, cost and time; the ticket; each branch with its last commit; the worktree, its ports, the tunnels and the database; "change worktree" when the guess is wrong.
+- **Sessions**: the other sessions open in this folder: what each is on, whether it's working, idle or needs you, its context and cost.
 - **Agents**: each subagent, its type and model, tools, tokens, context, time.
 - **Files**: what Claude is doing right now, and every file touched, with lines added/removed and "used by N" (how many files import it).
 - **GitHub**: this session's PRs, with review state, comments, commits someone else pushed, how far behind the base and main, checks, conflicts (and which files), and the deploy after a merge. Your other PRs are folded underneath.
 - **Jira**: status, the requirements checklist, bugs, code review and testing sub-tasks, the latest comment.
 - **Vercel**: deployments of this branch, when there are any.
-- **Controls**: switches for Next actions, What you should know, Replay, Reflect and the card after each task. They're remembered across sessions.
+- **Controls**: switches for What you should know, Next actions, Replay and Reflect. They're remembered across sessions.
 
-**After each task**, a card shows:
-- how long it took, the tools used, lines changed and cost;
-- **what you should know**: risks, side effects, assumptions, decisions left to you;
-- **Replay**: step through each edit as a diff, in the panel;
-- up to three **next actions** (press 1–3 to put one in the prompt box).
+**After each task**, under Claude's reply, each its own card:
+- **You should know**: risks, side effects, assumptions, decisions left to you.
+- **Replay**: the edits of that task; opens them in the panel one diff at a time, Previous/Next always in view.
+- **What's next**: up to three likely next prompts, each with a **Use** button that puts it in the prompt box (nothing is sent).
 
-**Reflect**: when you correct Claude, a card offers to save it as a rule, for this project (its CLAUDE.md) or for all projects (~/.claude/CLAUDE.md).
+**Reflect**: when you correct Claude, a card under the reply offers to save it as a rule, for this project (its CLAUDE.md) or for all projects (~/.claude/CLAUDE.md).
 
 ## Install
 

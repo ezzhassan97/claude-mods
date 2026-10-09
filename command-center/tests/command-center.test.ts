@@ -6,6 +6,8 @@ import { looksLikeCorrection } from '../hooks/features/reflect'
 import { pick, sightings, startArgs } from '../hooks/lib/focus'
 import { money, ticketKey } from '../hooks/lib/fmt'
 import { fit, width } from '../hooks/lib/svg'
+import { isLastBlock, squash } from '../hooks/views/cards'
+import { diffPage } from '../hooks/views/draw'
 
 // The command center's checks: the worktree detection, the Jira readers, reflect's trigger, the drawing kit,
 // and the band and the panel validating on the terminal and the desktop (an
@@ -27,6 +29,24 @@ describe('what this session is on', () => {
     const old = Array.from({ length: 60 }, () => sightings('/ims/.worktrees/seo-frontend/a.ts')).flat()
     const now = Array.from({ length: 30 }, () => sightings('/ims/.worktrees/render-images-backend/b.ts')).flat()
     expect(pick([...old, ...now])?.folder).toBe('render-images')
+  })
+})
+
+describe('cards under the reply, replay pages', () => {
+  test('the cards go under the last block of the answer only', () => {
+    const answer = 'First I read the files.\n\nDone. The bar now   shows both branches.'
+    const anchor = squash(answer).slice(-160)
+    expect(isLastBlock('Done. The bar now shows both branches.', anchor)).toBe(true)
+    expect(isLastBlock('First I read the files.', anchor)).toBe(false)
+    expect(isLastBlock('x'.repeat(300) + answer, squash('x'.repeat(300) + answer).slice(-160))).toBe(true)
+    expect(isLastBlock('', anchor)).toBe(false)
+  })
+  test('a long diff pages, each page still a valid hunk', () => {
+    const e = { id: 1, turnId: 't', path: '/r/a.ts', tool: 'Edit', before: 'a\nb\nc', after: 'A\nB\nC\nD', added: 4, removed: 3, at: 0 }
+    const p = diffPage(e, '/r', 2, 3)
+    expect(p.total).toBe(7)
+    expect(p.source.split('\n').slice(2)).toEqual(['@@ -3,1 +1,2 @@', '-c', '+A', '+B'])
+    expect(diffPage(e, '/r', 99, 3).from).toBe(4)
   })
 })
 

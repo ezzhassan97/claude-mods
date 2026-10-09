@@ -194,16 +194,25 @@ export function drawOverview(d: BarInput & { agents: Agent[]; startedAt: number;
       : []
     c.line(segs, right, 22)
   }
-  const needYou = d.others.filter(s => s.status === 'waiting')
   if (d.others.length) {
-    c.line([{ t: `${plural(d.others.length, 'other session')}`, cls: 's', size: 12 }, ...(needYou.length ? [{ t: `${needYou.length} need you`, pill: INK.amber, size: 11 } as Seg] : [])], [], 20)
-    for (const s of d.others.slice(0, 4)) {
-      c.line(
-        [{ dot: s.status === 'waiting' ? INK.amber : s.status === 'working' ? INK.clay : INK.gray, live: s.status !== 'idle' }, { t: s.project, size: 12 }, { t: s.ticket ?? s.branch ?? '', cls: 'm', size: 11.5, mono: true }, { t: s.status === 'waiting' ? (s.waitingFor ?? 'needs you') : s.title, cls: 's', size: 11.5, grow: true }],
-        [{ t: s.contextPct != null ? `${Math.round(s.contextPct)}%` : '', color: loadInk(s.contextPct), size: 11 }, { t: money(s.costUsd), cls: 'm', size: 11 }],
-        19,
-      )
-    }
+    const needYou = d.others.filter(s => s.status === 'waiting').length
+    c.line([{ t: `${plural(d.others.length, 'other session')} in this folder`, cls: 's', size: 12 }, ...(needYou ? [{ t: `${needYou} need${needYou === 1 ? 's' : ''} you`, pill: INK.amber, size: 11 } as Seg] : [])], [{ t: 'see Sessions', cls: 'm', size: 11 }], 20)
+  }
+  return c.svg()
+}
+
+/** Other sessions open in this folder: what each is on and doing, its context and cost. */
+export function drawSessions(beats: Beat[], w: number, now: number): string {
+  const c = new Canvas(w, 2)
+  for (const s of beats) {
+    const doing = s.status === 'waiting' ? (s.waitingFor ?? 'needs you') : s.status === 'working' ? 'working' : `idle · ${ago(s.updatedAt, now)} ago`
+    c.line(
+      [{ dot: s.status === 'waiting' ? INK.amber : s.status === 'working' ? INK.clay : INK.gray, live: s.status !== 'idle' }, { t: s.title, size: 12.5, bold: true, grow: true }],
+      [{ t: s.contextPct != null ? `ctx ${Math.round(s.contextPct)}%` : '', color: loadInk(s.contextPct), size: 11 }, { t: money(s.costUsd), cls: 'm', size: 11 }],
+      21,
+    )
+    c.line([{ t: '', size: 11 }, { t: s.ticket ?? s.branch ?? '', cls: 'm', size: 11, mono: true, gap: 15 }, { t: doing, color: s.status === 'waiting' ? INK.amber : undefined, cls: s.status === 'waiting' ? undefined : 's', size: 11.5, grow: true }, ...(s.agents ? [{ t: plural(s.agents, 'agent'), cls: 'm', size: 11 } as Seg] : [])], [], 19)
+    c.space(4)
   }
   return c.svg()
 }
@@ -319,30 +328,20 @@ export function drawDeploys(deploys: Deploy[], w: number, now: number): string {
 }
 
 /** The Replay timeline: every edit of the turn, the current one marked. */
-export function drawTimeline(edits: Edit[], current: number, w: number, root: string): string {
-  const c = new Canvas(w, 2)
-  const total = edits.reduce((n, e) => ({ a: n.a + e.added, r: n.r + e.removed }), { a: 0, r: 0 })
-  c.label(`${plural(edits.length, 'edit')} in ${plural(new Set(edits.map(e => e.path)).size, 'file')}`, `+${total.a} −${total.r}`)
-  edits.forEach((e, i) => {
-    const rel = e.path.startsWith(`${root}/`) ? e.path.slice(root.length + 1) : e.path
-    const isNow = i === current
-    const y = c.y
-    c.raw(
-      (isNow ? `<rect x="0" y="0" width="${w}" height="24" rx="7" fill="${INK.clay}" fill-opacity=".14"/>` : '') +
-        `<circle cx="13" cy="12" r="8.5" ${isNow ? `fill="${INK.clay}"` : 'fill="none" class="ln" stroke-width="1.2"'}/>` +
-        `<text x="13" y="16" text-anchor="middle" font-family="ui-sans-serif, -apple-system, sans-serif" font-size="10.5" font-weight="600" ${isNow ? 'fill="#fff"' : 'class="s"'}>${i + 1}</text>`,
-      0,
-    )
-    c.y = y
-    c.line([{ t: '', gap: 0, size: 10 }, { t: '', gap: 20, size: 10 }, { t: basename(rel), bold: isNow, size: 12.5 }, { t: dirname(rel) === '/' ? '' : `in ${dirname(rel)}`, cls: 'm', size: 11.5, grow: true }], [{ t: `+${e.added}`, color: INK.green, size: 11.5 }, { t: `−${e.removed}`, color: INK.red, size: 11.5, gap: 5 }], 24)
-  })
-  return c.svg()
-}
-
-/** Unified diff text for one edit, for the engine's own diff renderer. */
 export function unified(e: Edit, root: string): string {
   const rel = e.path.startsWith(`${root}/`) ? e.path.slice(root.length + 1) : basename(e.path)
   const before = e.before ? e.before.split('\n') : []
   const after = e.after ? e.after.split('\n') : []
   return [`--- a/${rel}`, `+++ b/${rel}`, `@@ -1,${before.length} +1,${after.length} @@`, ...before.map(l => `-${l}`), ...after.map(l => `+${l}`)].join('\n')
+}
+
+/** One page of an edit's diff, `room` lines from `start`, as a hunk of its own so it still draws as a diff. */
+export function diffPage(e: Edit, root: string, start: number, room: number): { source: string; from: number; to: number; total: number } {
+  const [minus, plus, , ...body] = unified(e, root).split('\n')
+  const from = Math.max(0, Math.min(start, Math.max(0, body.length - room)))
+  const lines = body.slice(from, from + room)
+  const count = (ls: string[], mark: string): number => ls.filter(l => l.startsWith(mark)).length
+  const before = body.slice(0, from)
+  const header = `@@ -${count(before, '-') + 1},${count(lines, '-')} +${count(before, '+') + 1},${count(lines, '+')} @@`
+  return { source: [minus, plus, header, ...lines].join('\n'), from, to: from + lines.length, total: body.length }
 }

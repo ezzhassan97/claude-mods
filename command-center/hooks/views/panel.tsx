@@ -7,12 +7,12 @@ import { CONTROLS, flip } from '../features/controls'
 import { checkConflicts, markSeen, refreshFocusPrs, refreshMine } from '../features/prs'
 import { refreshAll } from '../features/refresh'
 import { me } from '../features/session'
-import { fixTunnels, pickWorktree, ws } from '../features/workspace'
+import { fixTunnels, pickWorktree } from '../features/workspace'
 import { basename, money, plural, trunc } from '../lib/fmt'
 import type { Io } from '../lib/io'
-import { drawAgents, drawDeploys, drawFiles, drawJira, drawOverview, drawPr, drawPrList, drawTimeline, drawToggle, prLook, unified } from './draw'
+import { diffPage, drawAgents, drawDeploys, drawFiles, drawJira, drawOverview, drawPr, drawPrList, drawSessions, drawToggle, prLook } from './draw'
 
-// The side panel: one panel with tabs (Overview, Agents, Files, GitHub,
+// The side panel: one panel with tabs (Overview, Sessions, Agents, Files, GitHub,
 // Jira, Vercel when the branch deploys there, Controls); only the selected
 // tab's content shows. Replay takes the panel over until "Back".
 
@@ -20,7 +20,7 @@ type Table = Elements[RenderSurface]
 
 export const PANEL = 'command-center'
 
-export async function panelView(io: Io, E: Table, surface: RenderSurface, cols: number): Promise<RenderElement> {
+export async function panelView(io: Io, E: Table, surface: RenderSurface, cols: number, rows: number): Promise<RenderElement> {
   const { Box, Text, Button, Link, Code } = E
   const Select = 'Select' in E ? (E as Elements['desktop']).Select : null
   const Svg = surface === 'desktop' && 'Svg' in E ? (E as Elements['desktop']).Svg : null
@@ -32,35 +32,41 @@ export async function panelView(io: Io, E: Table, surface: RenderSurface, cols: 
     (await io.s.focus.get())?.branches.reduce((n, b) => n + b.dirty, 0) ?? 0,
   ]
 
-  // ---- Replay takes the whole panel
+  // ---- Replay takes the whole panel. The diff shows as many lines as fit, so
+  // the buttons under it are always in view; ▲ ▼ page through a longer one.
   if (panel.replay != null && edits[panel.replay]) {
     const current = edits[panel.replay]!
     const turnEdits = edits.filter(e => e.turnId === current.turnId)
     const at = turnEdits.indexOf(current)
     const root = focus?.root ?? me.root
-    const go = (i: number): void => void io.s.panel.set(p => ({ ...p, replay: edits.indexOf(turnEdits[Math.max(0, Math.min(turnEdits.length - 1, i))]!) }))
+    const room = Math.max(6, rows - 5)
+    const page = diffPage(current, root, panel.replayLine, room)
+    const go = (i: number): void => void io.s.panel.set(p => ({ ...p, replay: edits.indexOf(turnEdits[Math.max(0, Math.min(turnEdits.length - 1, i))]!), replayLine: 0 }))
+    const scrollTo = (line: number): void => void io.s.panel.set(p => ({ ...p, replayLine: Math.max(0, line) }))
+    const rel = current.path.startsWith(`${root}/`) ? current.path.slice(root.length + 1) : current.path
     return (
       <Box flexDirection="column">
         <Box justifyContent="space-between">
-          <Text bold>{`Replay · edit ${at + 1} of ${turnEdits.length}`}</Text>
+          <Text bold wrap="truncate-end">{`Edit ${at + 1} of ${turnEdits.length} · ${basename(current.path)}`}</Text>
           <Button key="replay-back" plain dimColor label="← Back" onPress={() => void io.s.panel.set(p => ({ ...p, replay: null }))} />
         </Box>
-        {Svg ? <Svg source={drawTimeline(turnEdits, at, w, root)} alt={`${turnEdits.length} edits`} /> : turnEdits.map((e, i) => <Text key={`tl-${e.id}`} bold={i === at} dimColor={i !== at}>{`${i + 1}. ${basename(e.path)}  +${e.added} −${e.removed}`}</Text>)}
-        <Box marginTop={1} flexDirection="column">
-          <Text bold>{basename(current.path)}</Text>
-          <Text dimColor wrap="truncate-end">{`${current.path.startsWith(`${root}/`) ? current.path.slice(root.length + 1) : current.path} · ${current.tool}`}</Text>
+        <Text dimColor wrap="truncate-end">{`${rel} · ${current.tool} · +${current.added} −${current.removed}`}</Text>
+        <Box marginTop={1}>
+          <Code source={page.source} format="diff" wrap="truncate-end" />
         </Box>
-        <Code source={unified(current, root)} format="diff" path={basename(current.path)} />
-        <Box columnGap={1} marginTop={1}>
-          <Button key="replay-prev" hotkey="p" label="Previous edit" onPress={() => go(at - 1)} />
-          <Button key="replay-next" hotkey="n" variant="primary" autoFocus label="Next edit" onPress={() => go(at + 1)} />
+        <Box columnGap={1} flexWrap="wrap">
+          <Button key="replay-prev" hotkey="p" label="◀ Previous" onPress={() => go(at - 1)} />
+          <Button key="replay-next" hotkey="n" variant="primary" autoFocus label="Next ▶" onPress={() => go(at + 1)} />
+          {page.total > room ? <Button key="replay-up" plain dimColor label="▲" onPress={() => scrollTo(panel.replayLine - room)} /> : null}
+          {page.total > room ? <Button key="replay-down" plain dimColor label="▼" onPress={() => scrollTo(Math.min(page.total - 1, panel.replayLine + room))} /> : null}
+          {page.total > room ? <Text dimColor>{`lines ${page.from + 1}–${page.to} of ${page.total}`}</Text> : null}
         </Box>
       </Box>
     )
   }
 
   // Tabs: one row at the top, only the selected tab's content below.
-  const available = ['overview', 'agents', 'files', 'github', 'jira', ...(github.deploys.length ? ['deploys'] : []), 'controls']
+  const available = ['overview', 'sessions', 'agents', 'files', 'github', 'jira', ...(github.deploys.length ? ['deploys'] : []), 'controls']
   const active = available.includes(panel.tab) ? panel.tab : 'overview'
   const isOpen = (id: string): boolean => id === active
   const tabs: { id: string; label: string }[] = []
@@ -81,7 +87,8 @@ export async function panelView(io: Io, E: Table, surface: RenderSurface, cols: 
   const sections: RenderElement[] = []
   const done = ticket?.requirements.filter(r => r.state !== 'open').length ?? 0
   const progress = ticket?.requirements.length ? { done, total: ticket.requirements.length } : null
-  const others = sessions
+  // Other sessions open in this folder (a heartbeat without a folder: by project name).
+  const others = sessions.filter(o => (o.root ? o.root === me.root : o.project === basename(me.root)))
 
   // Overview
   sections.push(header('overview', 'Overview', status === 'working' ? 'working' : status === 'waiting' ? 'needs you' : 'idle'))
@@ -108,6 +115,14 @@ export async function panelView(io: Io, E: Table, surface: RenderSurface, cols: 
         />,
       )
     }
+  }
+
+  // Sessions
+  const waiting = others.filter(o => o.status === 'waiting').length
+  sections.push(header('sessions', 'Sessions', others.length ? `${plural(others.length, 'other session')} in ${basename(me.root)}` : ''))
+  if (isOpen('sessions')) {
+    if (others.length) sections.push(picture(drawSessions(others, w, now), `${others.length} other sessions`, others.map(o => `${o.status === 'waiting' ? '!' : o.status === 'working' ? '◐' : '·'} ${o.title} · ${o.ticket ?? o.branch ?? ''} · ${o.status}`)))
+    else sections.push(<Text key="sessions-empty" dimColor wrap="wrap">{`No other session is open in ${basename(me.root)}. Sessions show here once they have loaded the command center (new ones do; open ones after /reload-plugins).`}</Text>)
   }
 
   // Agents
@@ -196,10 +211,10 @@ export async function panelView(io: Io, E: Table, surface: RenderSurface, cols: 
         </Box>,
       )
     }
-    if (ws.imsRoot) sections.push(<Text key="ims-on" dimColor wrap="wrap">{'Always on in ims-nawy: its rules (PRs into staging, Mazen reviews, no merges, the nawy token, schema changes ask first).'}</Text>)
   }
 
   const badge: Record<string, string> = {
+    sessions: waiting ? ` ${waiting}!` : others.length ? ` ${others.length}` : '',
     agents: running ? ` ${running}` : '',
     files: changed ? ` ${changed}` : '',
     github: hot ? ` ${hot}!` : github.focus.length ? ` ${github.focus.length}` : '',

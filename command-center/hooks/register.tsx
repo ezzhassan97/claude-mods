@@ -13,10 +13,10 @@ import { refreshMine } from './features/prs'
 import { looksLikeCorrection, reflect } from './features/reflect'
 import { refreshAll } from './features/refresh'
 import { agentSpawned, agentStep, measured, prompted, refreshUsage, sessionEnd, sessionStart, setStatus, toolEnded, toolStarted, turnEnded, turnStarted } from './features/session'
-import { report } from './features/standup'
 import { findImsRoot, learnFromHistory, notice, noticeStart, refreshEnv, refreshFocus, ws } from './features/workspace'
 import type { Cells, Io } from './lib/io'
 import { bandView } from './views/bar'
+import { cardsView, isLastBlock } from './views/cards'
 import { panelView } from './views/panel'
 
 // Command Center: what this session is on, at a glance, in every project.
@@ -46,7 +46,7 @@ const afterA = atom({ plugin: 'command-center', key: 'after' } as const, null)
 const goalA = atom({ plugin: 'command-center', key: 'goal' } as const, null)
 const rulesA = atom({ plugin: 'command-center', key: 'rules' } as const, [])
 const togglesA = atom({ plugin: 'command-center', key: 'toggles' } as const, DEFAULT_TOGGLES)
-const panelA = atom({ plugin: 'command-center', key: 'panel' } as const, { tab: 'overview', replay: null, showAllPrs: false, isPicking: false })
+const panelA = atom({ plugin: 'command-center', key: 'panel' } as const, { tab: 'overview', replay: null, replayLine: 0, showAllPrs: false, isPicking: false })
 
 function cells($: EngineInterface): Cells {
   return {
@@ -146,7 +146,7 @@ function makeIo($: EngineInterface): Io {
 }
 
 const COMMANDS = [
-  { name: 'cc', description: 'Command center: open or close the side panel (also: refresh, standup [days], replay)', argumentHint: '[refresh|standup [days]|replay]', immediate: true },
+  { name: 'cc', description: 'Command center: open or close the side panel (also: refresh, replay)', argumentHint: '[refresh|replay]', immediate: true },
   { name: 'replay', description: "Replay the last task's edits, one diff at a time", immediate: true },
 ] as const
 
@@ -154,7 +154,7 @@ async function openReplay(io: Io): Promise<string> {
   const edits = await io.s.edits.get()
   const last = edits[edits.length - 1]
   if (!last) return 'No edits to replay yet.'
-  await io.s.panel.set(p => ({ ...p, replay: edits.findIndex(x => x.turnId === last.turnId) }))
+  await io.s.panel.set(p => ({ ...p, replay: edits.findIndex(x => x.turnId === last.turnId), replayLine: 0 }))
   await io.togglePane(true)
   return 'Replaying the last edits in the command center panel.'
 }
@@ -267,15 +267,6 @@ export const register: Register = on => {
     result: await requirementsTool(makeIo($), e as unknown as { action?: string; ids?: number[]; state?: Requirement['state'] }),
   }))
 
-  // A mod's $.mcp.call goes through the session's permission check, so in auto
-  // mode the classifier (or, headless, nobody) must approve it. The engine never
-  // runs a mod's hooks for the mod's own calls; their `.catch` answers instead
-  // (`re-entry`). That is where this mod approves its own read-only Jira
-  // lookups, and nothing else: every call the model makes keeps its verdict.
-  on('tool.check', async ($, e, next) => next(e)).catch(($, e, next) =>
-    next.error.kind === 're-entry' && /^mcp__.+__(searchJiraIssuesUsingJql|getJiraIssue)$/.test(String(e.tool)) ? { decision: 'allow' } : next(e),
-  )
-
   on('skill.prompt', { skill: 'ims-end' }, async ($, e, next) => {
     const ticket = await read($, ticketA)
     if (!ticket?.requirements.length) return next(e)
@@ -293,8 +284,7 @@ export const register: Register = on => {
 
   on('command.run', { command: 'cc' }, async ($, e) => {
     const io = makeIo($)
-    const [word = '', arg = ''] = e.args.trim().split(/\s+/)
-    if (word === 'standup') return { text: await report(io, Math.max(1, Math.min(30, Number(arg) || 1)), '~/Main') }
+    const [word = ''] = e.args.trim().split(/\s+/)
     if (word === 'refresh') {
       void refreshAll(io).then(() => refreshMine(io)).then(() => refreshUsage(io))
       return { text: 'Refreshing the command center.' }
@@ -312,5 +302,13 @@ export const register: Register = on => {
     return bandView(makeIo($), $.ui.resolve(e), e.surface, e.props, below)
   })
 
-  on('ui.render', { component: 'Pane', requestId: 'command-center' }, async ($, e) => panelView(makeIo($), $.ui.resolve(e), e.surface, e.props.bodyColumns))
+  // The finished task's cards, under the last block of Claude's reply.
+  on('ui.render', { component: 'AssistantMessage' }, async ($, e, next) => {
+    const own = await next(e)
+    const after = await read($, afterA)
+    if (!after || after.state === 'hidden' || !isLastBlock(e.props.text, after.anchor)) return own
+    return cardsView(makeIo($), $.ui.resolve(e), e.surface, e.viewport?.columns ?? 100, own, after)
+  })
+
+  on('ui.render', { component: 'Pane', requestId: 'command-center' }, async ($, e) => panelView(makeIo($), $.ui.resolve(e), e.surface, e.props.bodyColumns, e.props.scroll.bodyRows))
 }

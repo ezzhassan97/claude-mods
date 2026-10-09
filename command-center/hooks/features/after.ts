@@ -2,10 +2,11 @@ import type { TurnCompleteInput } from 'claude-code'
 
 import type { After, Suggestion, Toggles } from '../../types'
 import { clean } from '../lib/fmt'
+import { squash } from '../views/cards'
 import type { Io } from '../lib/io'
 import { me, turn } from './session'
 
-// After Claude finishes something: one card with the receipt (time, tools,
+// After Claude finishes something, cards under its reply: the receipt (time, tools,
 // lines changed, cost), what you should know (risks, assumptions, side
 // effects, anything left for you to decide) and up to three next actions.
 // Both come from ONE fork of the session: it shares the prompt cache, so it
@@ -63,7 +64,6 @@ export async function turnFinished(io: Io, e: TurnCompleteInput, toggles: Toggle
   if (e.agentId || e.reason !== 'answer') return
   const edits = (await io.s.edits.get()).filter(x => x.turnId === turn.id).length
   const didWork = turn.tools > 0 || e.durationMs > 20_000
-  if (!didWork && e.answer.trim().length < MIN_ANSWER) return
   const cost = (await io.usage())?.cost?.usd ?? null
   const wantKnow = toggles.know && didWork
   const wantNext = toggles.next && e.answer.trim().length >= MIN_ANSWER
@@ -77,6 +77,7 @@ export async function turnFinished(io: Io, e: TurnCompleteInput, toggles: Toggle
     removed: turn.removed,
     costUsd: cost != null && turn.costAtStart != null && cost > turn.costAtStart ? cost - turn.costAtStart : null,
     edits,
+    anchor: squash(e.answer).slice(-160),
     know: [],
     next: [],
     dismissed: [],
