@@ -37,7 +37,14 @@ claude plugin marketplace add ~/Main/Personal/coding-projects/claude-mods/code
 claude plugin install command-center@ezz-mods --scope user
 ```
 
-Jira lookups from the mod go through your permission rules (a mod can't approve its own calls). To allow the two read-only Jira lookups, add them to `permissions.allow` in `~/.claude/settings.json`.
+On another machine, from the private GitHub backup (needs access to `ezzhassan97/claude-mods`):
+
+```bash
+claude plugin marketplace add ezzhassan97/claude-mods
+claude plugin install command-center@ezz-mods --scope user
+```
+
+Jira is read through the Atlassian connector your Claude account already has; nothing is written to Jira.
 
 ## Develop
 
