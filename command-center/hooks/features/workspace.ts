@@ -12,7 +12,8 @@ import { me } from './session'
 // each working copy: its branch, commits on it, how many are unpushed, how
 // far its base moved, and uncommitted changes. In ims-nawy also the
 // environment: the tunnels, Redis, the copy's ports and which database its
-// backend points at (the tunnel port is the shared staging DB).
+// backend points at (the tunnel port 3308 is the shared staging DB; any other
+// port, 3307, the local copy of it).
 
 export const ws = { imsRoot: '' as string, seen: [] as Sighting[], picked: null as string | null }
 
@@ -164,8 +165,9 @@ export async function refreshEnv(io: Io): Promise<void> {
   const fePort = Number(/localhost:(\d+)/.exec(envValue(feEnv, 'VITE_APP_COGNITO_REDIRECT_URI') ?? '')?.[1] ?? NaN)
   const bePort = Number(envValue(beEnv, 'SERVER_PORT') ?? NaN)
   const dbPort = Number(envValue(beEnv, 'DB_PORT') ?? NaN)
+  // a copy on the local MySQL (scripts/ims-worktree.sh db <folder> local) needs that server, not the tunnel
   const [mysql, mongo, redis, feUp, beUp] = await Promise.all([
-    isOpen(io, MYSQL_TUNNEL),
+    isOpen(io, Number.isFinite(dbPort) && dbPort !== MYSQL_TUNNEL ? dbPort : MYSQL_TUNNEL),
     isOpen(io, MONGO_TUNNEL),
     io.run(['redis-cli', 'ping'], { timeoutMs: 3000 }).then(r => r.ok && r.out === 'PONG'),
     Number.isFinite(fePort) ? isOpen(io, fePort) : Promise.resolve(false),

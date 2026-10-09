@@ -1,7 +1,7 @@
 import type { SessionMeasureInput, ToolCallInput, ToolCallResult, TurnUsage } from 'claude-code'
 
 import type { Activity, Agent, Beat, Edit, Status, Touch, Usage } from '../../types'
-import { basename, clean, lines, money, pct } from '../lib/fmt'
+import { basename, clean, lines, pct } from '../lib/fmt'
 import { json } from '../lib/io'
 import type { Io } from '../lib/io'
 
@@ -59,7 +59,7 @@ export async function refreshUsage(io: Io): Promise<void> {
   if (u) await io.s.usage.set(() => toUsage(u))
 }
 
-export async function measured(io: Io, e: RawUsage, budget: number): Promise<void> {
+export async function measured(io: Io, e: RawUsage): Promise<void> {
   const u = toUsage(e)
   await io.s.usage.set(() => u)
   const once = (key: string, text: string): void => {
@@ -68,7 +68,6 @@ export async function measured(io: Io, e: RawUsage, budget: number): Promise<voi
     io.toast(text, 8000)
   }
   if (u.contextPct != null && u.contextPct >= 85) once('ctx', `✻ Context ${pct(u.contextPct)} full — /compact soon to keep quality up`)
-  if (u.costUsd != null && budget > 0) for (const mark of [50, 80, 100]) if (u.costUsd >= (budget * mark) / 100) once(`cost${mark}`, `✻ ${money(u.costUsd)} spent — ${mark}% of the ${money(budget)} session budget`)
   for (const l of u.limits) if (l.percent >= 80) once(`limit-${l.kind}`, `✻ ${l.kind.replace('_', '-')} usage limit at ${pct(l.percent)}`)
 }
 

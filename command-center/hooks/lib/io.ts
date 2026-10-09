@@ -57,9 +57,11 @@ export function json<T>(text: string): T | null {
 // plugin's polling can't collide with your own git commands.
 export const git = (io: Io, cwd: string, ...args: string[]): Promise<Ran> => io.run(['git', '-C', cwd, ...args], { env: { GIT_OPTIONAL_LOCKS: '0' } })
 
-/** True when something listens on 127.0.0.1:<port>. */
+/** True when something listens on <port> here. Looks at the socket, never connects: a connection through an SSH
+ * tunnel reaches the remote DB, which counts each one closed before login and blocks the bastion after ~100
+ * (MySQL 1129 — it blocked staging on 2026-10-09 when this polled with `nc -z` every 20 s per session). */
 export const isOpen = async (io: Io, port: number): Promise<boolean> =>
-  (await io.run(['nc', '-z', '-G', '1', '127.0.0.1', String(port)], { timeoutMs: 3000 })).ok
+  (await io.run(['lsof', '-nP', `-iTCP:${port}`, '-sTCP:LISTEN'], { timeoutMs: 3000 })).ok
 
 /** `owner/name` from a git remote URL. */
 export const repoOf = (url: string): string | null => /[:/]([^/:]+\/[^/]+?)(?:\.git)?\/?$/.exec(url.trim())?.[1] ?? null

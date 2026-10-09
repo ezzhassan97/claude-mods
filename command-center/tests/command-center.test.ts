@@ -6,6 +6,8 @@ import { commandOf } from '../hooks/features/skills'
 import { looksLikeCorrection } from '../hooks/features/reflect'
 import { pick, sightings, startArgs } from '../hooks/lib/focus'
 import { dur, money, ticketKey } from '../hooks/lib/fmt'
+import { isOpen } from '../hooks/lib/io'
+import type { Io } from '../hooks/lib/io'
 import { fit, width } from '../hooks/lib/svg'
 import { isLastBlock, squash } from '../hooks/views/cards'
 import { diffPage } from '../hooks/views/draw'
@@ -30,6 +32,16 @@ describe('what this session is on', () => {
     const old = Array.from({ length: 60 }, () => sightings('/ims/.worktrees/seo-frontend/a.ts')).flat()
     const now = Array.from({ length: 30 }, () => sightings('/ims/.worktrees/render-images-backend/b.ts')).flat()
     expect(pick([...old, ...now])?.folder).toBe('render-images')
+  })
+})
+
+describe('environment checks never touch a remote database', () => {
+  test('a port check only looks for a local listener, never connects', async () => {
+    const ran: string[][] = []
+    const io = { run: async (argv: string[]) => (ran.push(argv), { ok: true, out: '', err: '', code: 0 }) } as unknown as Io
+    expect(await isOpen(io, 3308)).toBe(true)
+    // a connection through the SSH tunnel is a failed login at staging MySQL; ~100 of them block the host
+    expect(ran).toEqual([['lsof', '-nP', '-iTCP:3308', '-sTCP:LISTEN']])
   })
 })
 

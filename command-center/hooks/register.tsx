@@ -28,7 +28,6 @@ import { panelView } from './views/panel'
 
 const DEFAULT_TOGGLES: Toggles = { next: true, know: true, builtinKnow: true, replay: true, reflect: true }
 const EMPTY_GITHUB: Github = { focus: [], mine: [], deploys: [], at: 0, isLoading: false, error: null }
-const BUDGET_USD = 10
 
 const usageA = atom({ plugin: 'command-center', key: 'usage' } as const, null)
 const statusA = atom({ plugin: 'command-center', key: 'status' } as const, 'idle')
@@ -203,7 +202,7 @@ export const register: Register = on => {
   })
 
   on('session.measure', async ($, e, next) => {
-    await measured(makeIo($), e, BUDGET_USD)
+    await measured(makeIo($), e)
     return next(e)
   })
 
