@@ -95,7 +95,9 @@ export async function panelView(io: Io, E: Table, surface: RenderSurface, cols: 
   const waiting = others.filter(o => o.status === 'waiting').length
   const running = agents.filter(a => !a.endedAt).length
   const changed = touched.filter(t => t.edits).length
-  const hot = github.mine.filter(p => p.state === 'OPEN' && (p.review === 'CHANGES_REQUESTED' || p.mergeable === 'CONFLICTING' || p.newComments)).length
+  const needsYou = (p: (typeof github.mine)[number]): boolean => p.state === 'OPEN' && (p.review === 'CHANGES_REQUESTED' || p.mergeable === 'CONFLICTING' || !!p.newComments)
+  // the tab's badge counts this session's PRs only; the others are counted inside the tab
+  const hot = github.focus.filter(needsYou).length
   const kit = await io.s.kit.get()
 
   // Overview: the session at a glance, then one row per tab; › opens that tab.
@@ -203,7 +205,7 @@ export async function panelView(io: Io, E: Table, surface: RenderSurface, cols: 
     }
     const rest = github.mine.filter(p => !github.focus.some(f => f.url === p.url))
     if (rest.length) {
-      sections.push(<Button key="gh-all" plain dimColor label={`${panel.showAllPrs ? '▾' : '▸'} your other PRs · ${rest.length}`} onPress={() => void io.s.panel.set(p => ({ ...p, showAllPrs: !p.showAllPrs }))} />)
+      sections.push(<Button key="gh-all" plain dimColor label={`${panel.showAllPrs ? '▾' : '▸'} your other PRs · ${rest.length}${rest.filter(needsYou).length ? ` · ${rest.filter(needsYou).length} need you` : ''}`} onPress={() => void io.s.panel.set(p => ({ ...p, showAllPrs: !p.showAllPrs }))} />)
       if (panel.showAllPrs) sections.push(picture(drawPrList(rest, w), `${rest.length} other PRs`, rest.map(p => `${p.repo.split('/')[1]} #${p.number} ${prLook(p).text.replace(/^#\d+ /, '')} · ${trunc(p.title, 50)}`)))
     }
     sections.push(<Button key="gh-refresh" plain dimColor label={github.isLoading ? 'refreshing…' : 'refresh GitHub'} onPress={() => void refreshFocusPrs(io).then(() => refreshMine(io))} />)
@@ -265,7 +267,7 @@ export async function panelView(io: Io, E: Table, surface: RenderSurface, cols: 
     sessions: waiting ? ` ${waiting}!` : others.length ? ` ${others.length}` : '',
     agents: running ? ` ${running}` : '',
     files: changed ? ` ${changed}` : '',
-    github: hot ? ` ${hot}!` : github.focus.length ? ` ${github.focus.length}` : '',
+    github: hot ? ` ${hot}` : '',
     jira: ticket?.requirements.length ? ` ${done}/${ticket.requirements.length}` : '',
   }
   return (

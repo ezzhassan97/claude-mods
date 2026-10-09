@@ -73,7 +73,8 @@ async function branchOf(io: Io, root: string, side: Side): Promise<Branch | null
     git(io, root, 'rev-parse', '--abbrev-ref', '@{u}').then(r => r.ok),
     git(io, root, 'status', '--porcelain').then(r => r.out.split('\n').filter(Boolean).length),
     git(io, root, 'log', '-1', '--format=%s%x09%ct'),
-    onBase ? Promise.resolve({ out: '' }) : git(io, root, 'log', '-n', '20', '--format=%h%x09%ct%x09%an%x09%s', `${baseRef}..HEAD`),
+    // on a feature branch: its own commits; on main itself: main's latest
+    git(io, root, 'log', '-n', onBase ? '12' : '20', '--format=%h%x09%ct%x09%an%x09%s', ...(onBase ? ['HEAD'] : [`${baseRef}..HEAD`])),
     hasStaging ? count('origin/staging..HEAD') : Promise.resolve(0),
     hasStaging ? git(io, root, 'merge-base', '--is-ancestor', 'HEAD', 'origin/staging').then(r => r.ok) : Promise.resolve(false),
   ])

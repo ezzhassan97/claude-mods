@@ -351,6 +351,22 @@ export function drawGraph(b: Branch, pr: Pr | null | undefined, w: number, sessi
   const left = 64
   const right = w - 16
   const yMain = 14
+  // On main itself there is no branch: main's latest commits, the unpushed ones dashed.
+  if (b.branch && b.branch === b.base) {
+    const recent = [...b.log].reverse().slice(-12)
+    const gap = recent.length > 1 ? Math.min(34, (right - left - 150) / (recent.length - 1)) : 0
+    const parts = [text(4, yMain + 4, b.base, { cls: 's' }), `<line x1="${left}" x2="${right}" y1="${yMain}" y2="${yMain}" stroke="${INK.gray}" stroke-opacity=".55" stroke-width="2"/>`]
+    recent.forEach((k, i) => {
+      const x = left + 14 + gap * i
+      const mine = k.at >= sessionStart
+      parts.push(k.isPushed ? `<circle cx="${x}" cy="${yMain}" r="4.5" fill="${mine ? ink : INK.gray}" stroke="${mine ? ink : INK.gray}" stroke-width="2"/>` : `<circle cx="${x}" cy="${yMain}" r="4.5" class="card" stroke="${ink}" stroke-width="2" stroke-dasharray="2 2"/>`)
+    })
+    const unpushed = b.log.filter(k => !k.isPushed).length
+    parts.push(text(left + 14 + gap * Math.max(0, recent.length - 1) + 12, yMain - 6, unpushed ? `${unpushed} not pushed` : b.remote ? 'up to date with GitHub' : 'no GitHub remote', { color: unpushed ? INK.amber : undefined, cls: 's', size: 10.5 }))
+    c.space(8).raw(parts.join(''), 26)
+    c.text(`You're on ${b.base} itself, no feature branch${b.dirty ? ` · ${b.dirty} uncommitted` : ''}`, { cls: 'm', size: 11, lines: 1 })
+    return c.svg()
+  }
   const yBranch = 46
   const yStaging = 78
   const fork = left + 18
