@@ -21,7 +21,12 @@ import { drawBar, drawHeld, drawKnow, drawNext, drawReplay, drawRule, prFor, prL
 
 type Table = Elements[RenderSurface]
 
-export const barWidth = (cols: number): number => Math.max(300, Math.min(1500, cols * 8 - 118))
+// The desktop draws a band column about 8.25px wide (measured from screenshots of
+// the app). Cards take the band's full width; the bar leaves room for its button.
+// ponytail: a measured constant; recalibrate if the app changes its font.
+const PX_PER_COLUMN = 8.25
+export const cardWidth = (cols: number): number => Math.max(300, Math.min(1800, Math.floor(cols * PX_PER_COLUMN) - 6))
+export const barWidth = (cols: number): number => Math.max(260, cardWidth(cols) - 104)
 
 export async function bandView(io: Io, E: Table, surface: RenderSurface, props: { isWorking: boolean; bodyColumns: number }, below: RenderElement): Promise<RenderElement> {
   const { Box, Text, Button } = E
@@ -30,13 +35,14 @@ export async function bandView(io: Io, E: Table, surface: RenderSurface, props: 
     await io.s.held.get(), await io.s.rules.get(), await io.s.after.get(), await io.s.toggles.get(), await io.s.focus.get(), await io.s.env.get(),
     await io.s.ticket.get(), await io.s.github.get(), await io.s.usage.get(), await io.s.status.get(), await io.s.edits.get(), await io.home(),
   ]
-  const w = barWidth(props.bodyColumns)
+  const w = cardWidth(props.bodyColumns)
+  const bw = barWidth(props.bodyColumns)
   const parts: RenderElement[] = [below]
 
   if (held) {
     parts.push(
       <Box key="held" flexDirection="column" marginBottom={1}>
-        {Svg ? <Svg source={drawHeld(held, w)} alt={`Held: ${held.command} — ${held.summary}`} /> : <Text color="error" wrap="wrap">{`⚠ ${held.title}: ${held.command} — ${held.summary}`}</Text>}
+        {Svg ? <Svg width={w} source={drawHeld(held, w)} alt={`Held: ${held.command} — ${held.summary}`} /> : <Text color="error" wrap="wrap">{`⚠ ${held.title}: ${held.command} — ${held.summary}`}</Text>}
         <Box columnGap={1}>
           <Button key="held-run" variant="primary" hotkey="1" label={held.title === 'Recursive delete' && held.lines.length ? `Delete ${plural(held.lines.length, 'file')}` : 'Run it'} onPress={() => void decide(io, 'run')} />
           <Button key="held-cancel" hotkey="2" autoFocus label="Cancel" onPress={() => void decide(io, 'cancel')} />
@@ -50,7 +56,7 @@ export async function bandView(io: Io, E: Table, surface: RenderSurface, props: 
     const project = `${focus?.root ?? me.root}/CLAUDE.md`
     parts.push(
       <Box key={`rule-${rule.id}`} flexDirection="column" marginBottom={1}>
-        {Svg ? <Svg source={drawRule(rule, w, `${trunc(focus?.project ?? 'this project', 30)}/CLAUDE.md or ~/.claude/CLAUDE.md`)} alt={`Save this as a rule? ${rule.rule}`} /> : <Text color="success" wrap="wrap">{`Save this as a rule? “${rule.rule}”`}</Text>}
+        {Svg ? <Svg width={w} source={drawRule(rule, w, `${trunc(focus?.project ?? 'this project', 30)}/CLAUDE.md or ~/.claude/CLAUDE.md`)} alt={`Save this as a rule? ${rule.rule}`} /> : <Text color="success" wrap="wrap">{`Save this as a rule? “${rule.rule}”`}</Text>}
         <Box columnGap={1} flexWrap="wrap">
           <Button key="rule-project" variant="primary" label="Save for this project" onPress={() => void saveRule(io, rule, project, `${focus?.project ?? 'this project'}/CLAUDE.md`)} />
           <Button key="rule-global" label="Save for all projects" onPress={() => void saveRule(io, rule, `${home}/.claude/CLAUDE.md`, '~/.claude/CLAUDE.md')} />
@@ -68,7 +74,7 @@ export async function bandView(io: Io, E: Table, surface: RenderSurface, props: 
     if (toggles.know && !after.dismissed.includes('know') && (isLoading || after.know.length)) {
       parts.push(
         <Box key={`know-${after.turnId}`} flexDirection="column" marginBottom={1}>
-          {Svg ? <Svg source={drawKnow(after.know, w, isLoading)} alt={`You should know: ${after.know.join(' ')}`} /> : <Box flexDirection="column">{after.know.map((k, i) => <Text key={`k-${i}`} color="warning" wrap="wrap">{`💡 ${k}`}</Text>)}</Box>}
+          {Svg ? <Svg width={w} source={drawKnow(after.know, w, isLoading)} alt={`You should know: ${after.know.join(' ')}`} /> : <Box flexDirection="column">{after.know.map((k, i) => <Text key={`k-${i}`} color="warning" wrap="wrap">{`💡 ${k}`}</Text>)}</Box>}
           {isLoading ? null : (
             <Box columnGap={1}>
               <Button key="know-more" label="Tell me more" onPress={() => {
@@ -86,7 +92,7 @@ export async function bandView(io: Io, E: Table, surface: RenderSurface, props: 
       const first = edits.indexOf(turnEdits[0]!)
       parts.push(
         <Box key={`replay-${after.turnId}`} flexDirection="column" marginBottom={1}>
-          {Svg ? <Svg source={drawReplay({ ...after, edits: turnEdits.length }, [...new Set(turnEdits.map(e => e.path))], w)} alt={`${turnEdits.length} edits ready to replay`} /> : <Text color="claude">{`▶ ${plural(turnEdits.length, 'edit')} ready to replay · ${dur(after.durationMs)}`}</Text>}
+          {Svg ? <Svg width={w} source={drawReplay({ ...after, edits: turnEdits.length }, [...new Set(turnEdits.map(e => e.path))], w)} alt={`${turnEdits.length} edits ready to replay`} /> : <Text color="claude">{`▶ ${plural(turnEdits.length, 'edit')} ready to replay · ${dur(after.durationMs)}`}</Text>}
           <Box columnGap={1}>
             <Button key="replay-go" variant="primary" label="Replay edits" onPress={() => void io.s.panel.set(p => ({ ...p, replay: Math.max(0, first) })).then(() => io.togglePane(true))} />
             <Button key="replay-close" plain dimColor label="Dismiss" onPress={close('replay')} />
@@ -97,7 +103,7 @@ export async function bandView(io: Io, E: Table, surface: RenderSurface, props: 
     if (toggles.next && after.next.length && !after.dismissed.includes('next')) {
       parts.push(
         <Box key={`next-${after.turnId}`} flexDirection="column" marginBottom={1}>
-          {Svg ? <Svg source={drawNext(w)} alt="What's next" /> : <Text color="suggestion">What's next · press 1–3 to put one in the prompt box</Text>}
+          {Svg ? <Svg width={w} source={drawNext(w)} alt="What's next" /> : <Text color="suggestion">What's next · press 1–3 to put one in the prompt box</Text>}
           <Box flexDirection="column" rowGap={0}>
             {after.next.map((n, i) => (
               <Button key={`next-${i}`} hotkey={String(i + 1)} label={n.prompt === n.label ? n.label : `${n.label} — ${trunc(n.prompt, 90)}`} onPress={() => void takeNext(io, n)} />
@@ -120,7 +126,7 @@ export async function bandView(io: Io, E: Table, surface: RenderSurface, props: 
     Svg ? (
       <Box key="bar" flexDirection="row" alignItems="center" justifyContent="space-between" columnGap={1}>
         <Box flexGrow={1} flexShrink={1}>
-          <Svg source={drawBar({ focus, env, ticket, github, usage, status, title, progress }, w)} alt={barAlt(focus, ticket, usage)} />
+          <Svg width={bw} source={drawBar({ focus, env, ticket, github, usage, status, title, progress }, bw)} alt={barAlt(focus, ticket, usage)} />
         </Box>
         <Box flexShrink={0}>
           <Button key="bar-open" label="Open ▸" onPress={open} />
