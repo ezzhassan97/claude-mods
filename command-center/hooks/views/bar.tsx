@@ -36,7 +36,7 @@ export async function bandView(io: Io, E: Table, surface: RenderSurface, props: 
   if (held) {
     parts.push(
       <Box key="held" flexDirection="column" marginBottom={1}>
-        {Svg ? <Svg width={w} source={drawHeld(held, w)} alt={`Held: ${held.command} — ${held.summary}`} /> : <Text color="error" wrap="wrap">{`⚠ ${held.title}: ${held.command} — ${held.summary}`}</Text>}
+        {Svg ? <Svg source={drawHeld(held, w)} alt={`Held: ${held.command} — ${held.summary}`} /> : <Text color="error" wrap="wrap">{`⚠ ${held.title}: ${held.command} — ${held.summary}`}</Text>}
         <Box columnGap={1}>
           <Button key="held-run" variant="primary" hotkey="1" label={held.title === 'Recursive delete' && held.lines.length ? `Delete ${plural(held.lines.length, 'file')}` : 'Run it'} onPress={() => void decide(io, 'run')} />
           <Button key="held-cancel" hotkey="2" autoFocus label="Cancel" onPress={() => void decide(io, 'cancel')} />
@@ -50,7 +50,7 @@ export async function bandView(io: Io, E: Table, surface: RenderSurface, props: 
     const project = `${focus?.root ?? me.root}/CLAUDE.md`
     parts.push(
       <Box key={`rule-${rule.id}`} flexDirection="column" marginBottom={1}>
-        {Svg ? <Svg width={w} source={drawRule(rule, w, `${trunc(focus?.project ?? 'this project', 30)}/CLAUDE.md or ~/.claude/CLAUDE.md`)} alt={`Save this as a rule? ${rule.rule}`} /> : <Text color="success" wrap="wrap">{`Save this as a rule? “${rule.rule}”`}</Text>}
+        {Svg ? <Svg source={drawRule(rule, w, `${trunc(focus?.project ?? 'this project', 30)}/CLAUDE.md or ~/.claude/CLAUDE.md`)} alt={`Save this as a rule? ${rule.rule}`} /> : <Text color="success" wrap="wrap">{`Save this as a rule? “${rule.rule}”`}</Text>}
         <Box columnGap={1} flexWrap="wrap">
           <Button key="rule-project" variant="primary" label="Save for this project" onPress={() => void saveRule(io, rule, project, `${focus?.project ?? 'this project'}/CLAUDE.md`)} />
           <Button key="rule-global" label="Save for all projects" onPress={() => void saveRule(io, rule, `${home}/.claude/CLAUDE.md`, '~/.claude/CLAUDE.md')} />
@@ -68,7 +68,7 @@ export async function bandView(io: Io, E: Table, surface: RenderSurface, props: 
     if (toggles.know && !after.dismissed.includes('know') && (isLoading || after.know.length)) {
       parts.push(
         <Box key={`know-${after.turnId}`} flexDirection="column" marginBottom={1}>
-          {Svg ? <Svg width={w} source={drawKnow(after.know, w, isLoading)} alt={`You should know: ${after.know.join(' ')}`} /> : <Box flexDirection="column">{after.know.map((k, i) => <Text key={`k-${i}`} color="warning" wrap="wrap">{`💡 ${k}`}</Text>)}</Box>}
+          {Svg ? <Svg source={drawKnow(after.know, w, isLoading)} alt={`You should know: ${after.know.join(' ')}`} /> : <Box flexDirection="column">{after.know.map((k, i) => <Text key={`k-${i}`} color="warning" wrap="wrap">{`💡 ${k}`}</Text>)}</Box>}
           {isLoading ? null : (
             <Box columnGap={1}>
               <Button key="know-more" label="Tell me more" onPress={() => {
@@ -86,7 +86,7 @@ export async function bandView(io: Io, E: Table, surface: RenderSurface, props: 
       const first = edits.indexOf(turnEdits[0]!)
       parts.push(
         <Box key={`replay-${after.turnId}`} flexDirection="column" marginBottom={1}>
-          {Svg ? <Svg width={w} source={drawReplay({ ...after, edits: turnEdits.length }, [...new Set(turnEdits.map(e => e.path))], w)} alt={`${turnEdits.length} edits ready to replay`} /> : <Text color="claude">{`▶ ${plural(turnEdits.length, 'edit')} ready to replay · ${dur(after.durationMs)}`}</Text>}
+          {Svg ? <Svg source={drawReplay({ ...after, edits: turnEdits.length }, [...new Set(turnEdits.map(e => e.path))], w)} alt={`${turnEdits.length} edits ready to replay`} /> : <Text color="claude">{`▶ ${plural(turnEdits.length, 'edit')} ready to replay · ${dur(after.durationMs)}`}</Text>}
           <Box columnGap={1}>
             <Button key="replay-go" variant="primary" label="Replay edits" onPress={() => void io.s.panel.set(p => ({ ...p, replay: Math.max(0, first) })).then(() => io.togglePane(true))} />
             <Button key="replay-close" plain dimColor label="Dismiss" onPress={close('replay')} />
@@ -97,27 +97,30 @@ export async function bandView(io: Io, E: Table, surface: RenderSurface, props: 
     if (toggles.next && after.next.length && !after.dismissed.includes('next')) {
       parts.push(
         <Box key={`next-${after.turnId}`} flexDirection="column" marginBottom={1}>
-          {Svg ? <Svg width={w} source={drawNext(after.next, w)} alt={`What's next: ${after.next.map(n => n.label).join(', ')}`} /> : <Text color="suggestion">What's next</Text>}
-          <Box columnGap={1} flexWrap="wrap">
+          {Svg ? <Svg source={drawNext(w)} alt="What's next" /> : <Text color="suggestion">What's next · press 1–3 to put one in the prompt box</Text>}
+          <Box flexDirection="column" rowGap={0}>
             {after.next.map((n, i) => (
-              <Button key={`next-${i}`} hotkey={String(i + 1)} label={n.label} onPress={() => void takeNext(io, n)} />
+              <Button key={`next-${i}`} hotkey={String(i + 1)} label={n.prompt === n.label ? n.label : `${n.label} — ${trunc(n.prompt, 90)}`} onPress={() => void takeNext(io, n)} />
             ))}
-            <Button key="next-close" plain dimColor label="Dismiss" onPress={close('next')} />
+            <Box>
+              <Button key="next-close" plain dimColor label="Dismiss" onPress={close('next')} />
+            </Box>
           </Box>
         </Box>,
       )
     }
   }
 
+  const goal = await io.s.goal.get()
   const done = ticket?.requirements.filter(r => r.state !== 'open').length ?? 0
-  const progress = ticket?.requirements.length ? { done, total: ticket.requirements.length } : null
-  const title = ticket?.summary ?? (me.lastPrompt || me.title)
+  const progress = ticket?.requirements.length ? { done, total: ticket.requirements.length } : goal ? { done: goal.steps.filter(x => x.done).length, total: goal.steps.length } : null
+  const title = ticket?.summary ?? goal?.title ?? (me.lastPrompt || me.title)
   const open = (): void => void io.togglePane()
   parts.push(
     Svg ? (
       <Box key="bar" flexDirection="row" alignItems="center" justifyContent="space-between" columnGap={1}>
-        <Box flexShrink={1}>
-          <Svg width={w} source={drawBar({ focus, env, ticket, github, usage, status, title, progress }, w)} alt={barAlt(focus, ticket, usage)} />
+        <Box flexGrow={1} flexShrink={1}>
+          <Svg source={drawBar({ focus, env, ticket, github, usage, status, title, progress }, w)} alt={barAlt(focus, ticket, usage)} />
         </Box>
         <Box flexShrink={0}>
           <Button key="bar-open" label="Open ▸" onPress={open} />

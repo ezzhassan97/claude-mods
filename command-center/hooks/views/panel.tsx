@@ -60,7 +60,7 @@ export async function panelView(io: Io, E: Table, surface: RenderSurface, cols: 
   }
 
   // Tabs: one row at the top, only the selected tab's content below.
-  const available = ['overview', ...(agents.length ? ['agents'] : []), 'files', 'github', ...(focus?.ticket || ticket ? ['jira'] : []), ...(github.deploys.length ? ['deploys'] : []), 'controls']
+  const available = ['overview', 'agents', 'files', 'github', 'jira', ...(github.deploys.length ? ['deploys'] : []), 'controls']
   const active = available.includes(panel.tab) ? panel.tab : 'overview'
   const isOpen = (id: string): boolean => id === active
   const tabs: { id: string; label: string }[] = []
@@ -88,7 +88,7 @@ export async function panelView(io: Io, E: Table, surface: RenderSurface, cols: 
   if (isOpen('overview')) {
     sections.push(
       picture(
-        drawOverview({ focus, env, ticket, github, usage, status, title: ticket?.summary ?? me.title, progress, agents, startedAt: me.startedAt, now, others }, w),
+        drawOverview({ focus, env, ticket, github, usage, status, title: ticket?.summary ?? me.title, progress, agents, startedAt: me.startedAt, now, others, goal: await io.s.goal.get() }, w),
         'Session overview',
         [`${ticket ? `${ticket.key} ${ticket.status} · ` : ''}${focus?.project ?? ''}`, ...(focus?.branches ?? []).map(b => `${b.side}: ${b.branch} · ${plural(b.commits, 'commit')}${b.unpushed ? ` ↑${b.unpushed}` : ''}`), `ctx ${Math.round(usage?.contextPct ?? 0)}% · ${money(usage?.costUsd)}`],
       ),
@@ -112,9 +112,10 @@ export async function panelView(io: Io, E: Table, surface: RenderSurface, cols: 
 
   // Agents
   const running = agents.filter(a => !a.endedAt).length
-  if (agents.length) {
-    sections.push(header('agents', 'Agents', `${running} running · ${agents.length - running} done`))
-    if (isOpen('agents')) sections.push(picture(drawAgents([...agents].sort((a, b) => Number(!!a.endedAt) - Number(!!b.endedAt) || b.startedAt - a.startedAt).slice(0, 10), w, now), `${agents.length} agents`, agents.map(a => `${a.endedAt ? '✓' : '◐'} ${a.description} · ${a.tools} tools`)))
+  sections.push(header('agents', 'Agents', agents.length ? `${running} running · ${agents.length - running} done` : ''))
+  if (isOpen('agents') && !agents.length) sections.push(<Text key="agents-empty" dimColor wrap="wrap">No agents in this session yet. When Claude hands work to a subagent, it shows here with its task, model, tools, tokens and time.</Text>)
+  {
+    if (isOpen('agents') && agents.length) sections.push(picture(drawAgents([...agents].sort((a, b) => Number(!!a.endedAt) - Number(!!b.endedAt) || b.startedAt - a.startedAt).slice(0, 10), w, now), `${agents.length} agents`, agents.map(a => `${a.endedAt ? '✓' : '◐'} ${a.description} · ${a.tools} tools`)))
   }
 
   // Files
@@ -153,8 +154,9 @@ export async function panelView(io: Io, E: Table, surface: RenderSurface, cols: 
   }
 
   // Jira
+  sections.push(header('jira', 'Jira', ticket ? `${ticket.key} · ${ticket.status}` : (focus?.ticket ?? '')))
+  if (isOpen('jira') && !focus?.ticket && !ticket) sections.push(<Text key="jira-empty" dimColor wrap="wrap">No Jira ticket for this session: its branch names none (an IMS branch like IMS-2423-… does). Start work with /ims-start and the story, requirements, bugs and comments show here.</Text>)
   if (focus?.ticket || ticket) {
-    sections.push(header('jira', 'Jira', ticket ? `${ticket.key} · ${ticket.status}` : (focus?.ticket ?? '')))
     if (isOpen('jira')) {
       if (ticket?.error && !ticket.summary) sections.push(<Text key="jira-err" color="error" wrap="wrap">{ticket.error}</Text>)
       if (ticket) {

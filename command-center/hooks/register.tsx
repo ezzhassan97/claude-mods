@@ -44,6 +44,7 @@ const githubA = atom({ plugin: 'command-center', key: 'github' } as const, EMPTY
 const ticketA = atom({ plugin: 'command-center', key: 'ticket' } as const, null)
 const sessionsA = atom({ plugin: 'command-center', key: 'sessions' } as const, [])
 const afterA = atom({ plugin: 'command-center', key: 'after' } as const, null)
+const goalA = atom({ plugin: 'command-center', key: 'goal' } as const, null)
 const rulesA = atom({ plugin: 'command-center', key: 'rules' } as const, [])
 const heldA = atom({ plugin: 'command-center', key: 'held' } as const, null)
 const togglesA = atom({ plugin: 'command-center', key: 'toggles' } as const, DEFAULT_TOGGLES)
@@ -65,6 +66,7 @@ function cells($: EngineInterface): Cells {
     ticket: { get: () => read($, ticketA), set: async c => void (await update($, ticketA, c)) },
     sessions: { get: () => read($, sessionsA), set: async c => void (await update($, sessionsA, c)) },
     after: { get: () => read($, afterA), set: async c => void (await update($, afterA, c)) },
+    goal: { get: () => read($, goalA), set: async c => void (await update($, goalA, c)) },
     rules: { get: () => read($, rulesA), set: async c => void (await update($, rulesA, c)) },
     held: { get: () => read($, heldA), set: async c => void (await update($, heldA, c)) },
     toggles: { get: () => read($, togglesA), set: async c => void (await update($, togglesA, c)) },
@@ -131,7 +133,7 @@ function makeIo($: EngineInterface): Io {
       return $.mcp.call(server, tool, args)
     },
     suggest: text => void $.prompt.suggest({ text }).catch(() => undefined),
-    fill: async text => (await $.prompt.fill({ text }).catch(() => null))?.isFilled === true,
+    fill: async text => (await $.prompt.fill({ text, mode: 'replace' }).catch(() => null))?.isFilled === true,
     toast: (text, ms) => $.ui.toast(text, ms ? { timeoutMs: ms } : undefined),
     debug: text => $.ui.log(text, { to: 'debug' }),
     copy: async (text, surface) => (await $.ui.copy({ text, surface }).catch(() => null))?.isCopied === true,
@@ -170,6 +172,8 @@ export const register: Register = on => {
     const mine = await $.store.get('mine')
     if (Array.isArray(mine)) await update($, githubA, g => ({ ...g, mine: mine as Github['mine'] }))
     await sessionStart(io)
+    const savedGoal = await $.store.get(`goal:${await $.session.id()}`)
+    if (savedGoal && typeof savedGoal === 'object') await update($, goalA, () => savedGoal as never)
     const builtinKnow = await readBuiltinKnow(io)
     await update($, togglesA, t => ({ ...t, builtinKnow }))
     ws.imsRoot = await findImsRoot(io, e.cwd)

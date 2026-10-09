@@ -1,4 +1,4 @@
-import type { After, Agent, Beat, Branch, Deploy, Edit, Env, Focus, Github, Held, Pr, Rule, Status, Ticket, Touch, Usage } from '../../types'
+import type { After, Agent, Beat, Branch, Deploy, Edit, Env, Focus, Github, Goal, Held, Pr, Rule, Status, Ticket, Touch, Usage } from '../../types'
 import { ago, basename, dirname, dur, money, plural, tokens } from '../lib/fmt'
 import { Canvas, INK, loadInk, statusInk } from '../lib/svg'
 import type { Seg } from '../lib/svg'
@@ -52,7 +52,7 @@ export type BarInput = {
 
 /** The bar above the prompt: who this session is (line 1) and each branch (one line each). */
 export function drawBar(d: BarInput, w: number): string {
-  const c = new Canvas(w, 12, { bar: true }).space(3)
+  const c = new Canvas(w, 12, { bar: true }, true).space(3)
   const working = d.status === 'working'
   const waiting = d.status === 'waiting'
   const head: Seg = { dot: waiting ? INK.amber : working ? INK.clay : d.ticket ? statusInk(d.ticket.status, d.ticket.category) : INK.gray, live: working || waiting }
@@ -92,7 +92,7 @@ export function drawBar(d: BarInput, w: number): string {
 
 /** You should know: what a finished task left that you could easily miss. */
 export function drawKnow(know: string[], w: number, isLoading: boolean): string {
-  const c = new Canvas(w, 0, { icon: 'bulb', ink: INK.amber }).space(12)
+  const c = new Canvas(w, 0, { icon: 'bulb', ink: INK.amber }, true).space(12)
   c.label('You should know', isLoading ? 'checking the task you just finished…' : 'about the task you just finished', INK.amber)
   if (isLoading) c.text('Looking for risks, side effects and decisions left to you…', { cls: 'm', size: 12.5, lines: 1 })
   for (const k of know.slice(0, 3)) c.text(k, { size: 13.5, lines: 3, bullet: INK.amber })
@@ -100,18 +100,16 @@ export function drawKnow(know: string[], w: number, isLoading: boolean): string 
   return c.svg()
 }
 
-/** What's next: the likely next prompts, numbered for the buttons under them. */
-export function drawNext(next: { label: string; prompt: string }[], w: number): string {
-  const c = new Canvas(w, 0, { icon: 'next', ink: INK.blue }).space(12)
-  c.label("What's next", 'press 1–3 to put one in the prompt box', INK.blue)
-  next.slice(0, 3).forEach((n, i) => c.line([{ t: String(i + 1), color: INK.blue, bold: true, size: 12.5 }, { t: n.label, bold: true, size: 13 }, { t: n.prompt === n.label ? '' : n.prompt, cls: 'm', size: 12, grow: true }], [], 22))
-  c.space(6)
-  return c.svg()
+/** What's next: a header for the suggestion buttons under it (they only fill the prompt box). */
+export function drawNext(w: number): string {
+  const c = new Canvas(w, 14, { bar: true }, true).space(4)
+  c.label("What's next", 'click one, or press 1–3: it goes into your prompt box, nothing is sent', INK.blue)
+  return c.space(2).svg()
 }
 
 /** Replay: the edits of the task you just finished, ready to step through. */
 export function drawReplay(a: After, files: string[], w: number): string {
-  const c = new Canvas(w, 0, { icon: 'play', ink: INK.clay }).space(12)
+  const c = new Canvas(w, 0, { icon: 'play', ink: INK.clay }, true).space(12)
   const stats = [dur(a.durationMs), a.tools ? plural(a.tools, 'tool') : '', a.costUsd != null ? money(a.costUsd) : ''].filter(Boolean).join(' · ')
   c.label('Replay', stats, INK.clay)
   c.line([{ t: `${plural(a.edits, 'edit')} ready to replay`, bold: true, size: 14 }, { t: `+${a.added} −${a.removed}`, cls: 's', size: 12.5 }], [], 24)
@@ -122,7 +120,7 @@ export function drawReplay(a: After, files: string[], w: number): string {
 
 /** A correction you made, offered as a rule. */
 export function drawRule(r: Rule, w: number, target: string): string {
-  const c = new Canvas(w, 0, { icon: 'bookmark', ink: INK.green }).space(12)
+  const c = new Canvas(w, 0, { icon: 'bookmark', ink: INK.green }, true).space(12)
   c.label('Save this as a rule?', `${Math.round(r.confidence * 100)}% sure`, INK.green)
   c.text(`“${r.rule}”`, { size: 14.5, lines: 3 })
   c.text(`From what you said: “${r.quote}”`, { cls: 's', size: 12, lines: 2 })
@@ -133,7 +131,7 @@ export function drawRule(r: Rule, w: number, target: string): string {
 
 /** A risky command held until you answer. */
 export function drawHeld(h: Held, w: number): string {
-  const c = new Canvas(w, 0, { icon: h.title === 'Recursive delete' ? 'trash' : 'shield', ink: INK.red }).space(12)
+  const c = new Canvas(w, 0, { icon: h.title === 'Recursive delete' ? 'trash' : 'shield', ink: INK.red }, true).space(12)
   c.label(`Held · ${h.title}`, 'waiting for you', INK.red)
   c.line([{ t: h.command, mono: true, size: 13, bold: true, grow: true }], [], 22)
   c.text(h.summary, { color: INK.red, size: 14, lines: 2 })
@@ -160,7 +158,7 @@ export function drawToggle(name: string, what: string, isOn: boolean, w: number)
 
 // ---- the side panel's sections
 
-export function drawOverview(d: BarInput & { agents: Agent[]; startedAt: number; now: number; others: Beat[] }, w: number): string {
+export function drawOverview(d: BarInput & { agents: Agent[]; startedAt: number; now: number; others: Beat[]; goal: Goal | null }, w: number): string {
   const c = new Canvas(w, 2)
   c.tiles([
     { label: 'Context', value: d.usage?.contextPct != null ? `${Math.round(d.usage.contextPct)}%` : '—', color: loadInk(d.usage?.contextPct) },
@@ -168,6 +166,14 @@ export function drawOverview(d: BarInput & { agents: Agent[]; startedAt: number;
     { label: 'Cost', value: money(d.usage?.costUsd) },
     { label: 'Time', value: dur(Math.max(0, d.now - d.startedAt)) },
   ])
+  if (d.goal) {
+    const done = d.goal.steps.filter(x => x.done).length
+    c.label('Goal', `${done} of ${d.goal.steps.length} steps`, INK.clay)
+    c.text(d.goal.title, { size: 14, lines: 2 })
+    c.progress(done / d.goal.steps.length, done === d.goal.steps.length ? INK.green : INK.clay, 5)
+    for (const step of d.goal.steps) c.line([{ t: step.done ? '✓' : '○', color: step.done ? INK.green : INK.gray, bold: true, size: 12 }, { t: step.text, size: 12, cls: step.done ? 's' : 't', grow: true }], [], 19)
+    c.space(6)
+  }
   if (d.ticket) {
     c.line([{ dot: statusInk(d.ticket.status, d.ticket.category) }, { t: d.ticket.key, bold: true }, { t: d.ticket.status, pill: statusInk(d.ticket.status, d.ticket.category), size: 11 }, { t: d.ticket.summary, grow: true }], [], 22)
   }

@@ -11,7 +11,7 @@ for mode in light dark; do
   scheme=$([ "$mode" = dark ] && echo 0 || echo 1)
   rm -f "$out/$mode.png"
   "$chrome" --headless=new --disable-gpu --hide-scrollbars --user-data-dir="$out/profile-$mode" \
-    --blink-settings=preferredColorScheme=$scheme --window-size=840,${HEIGHT:-2600} \
+    --blink-settings=preferredColorScheme=$scheme --window-size=1080,${HEIGHT:-2600} \
     --screenshot="$out/$mode.png" "file://$here/preview.html" >/dev/null 2>&1 &
   pid=$!
   for _ in $(seq 1 60); do [ -s "$out/$mode.png" ] && break; sleep 0.5; done

@@ -89,10 +89,10 @@ const blocks: [string, string][] = [
   ['Bar · any other repo', drawBar(generic, W)],
   ['Card · you should know', drawKnow(after.know, W, false)],
   ['Card · replay', drawReplay(after, ['/x/src/AmenityMap.tsx', '/x/src/usePinCluster.ts', '/x/src/amenity.mapper.ts'], W)],
-  ['Card · what\'s next', drawNext(after.next, W)],
+  ['Card · what\'s next', drawNext(W)],
   ['Card · reflect', drawRule(rule, W, './CLAUDE.md')],
   ['Card · guard', drawHeld(held, W)],
-  ['Panel · overview', drawOverview({ ...bar, agents, startedAt: now - 47 * min, now, others }, P)],
+  ['Panel · overview', drawOverview({ ...bar, agents, startedAt: now - 47 * min, now, others, goal: { title: 'Masterplan amenities enhancements', steps: [{ text: 'Touchpad zoom and wider range', done: true }, { text: 'Amenity names on the masterplan', done: true }, { text: 'Collapsible amenities column', done: false }, { text: 'Test on staging and open the PRs', done: false }], at: now } }, P)],
   ['Panel · agents', drawAgents(agents, P, now)],
   ['Panel · files', drawFiles({ activity: { verb: 'editing', target: touched[0]!.path }, branch: 'IMS-2423-Masterplan-Amenities-Enhancements', changed: 3, touched, root: '/x/ims-nawy/.worktrees' }, P)],
   ['Panel · GitHub (this PR)', drawPr(focusPrs[1]!, P, now)],
@@ -108,7 +108,7 @@ const html = `<!doctype html><meta charset="utf-8"><title>Command center preview
 <style>body{margin:0;padding:24px;font:13px -apple-system,system-ui,sans-serif;background:#faf9f5;color:#1f1e1d}
 @media (prefers-color-scheme:dark){body{background:#1f1e1d;color:#ecebe6}}
 h3{font-size:11px;letter-spacing:.06em;text-transform:uppercase;opacity:.55;margin:22px 0 6px}
-.f{display:inline-block;border:1px dashed rgba(128,128,128,.35);border-radius:10px;padding:8px}</style>
+.f{display:block;width:1000px;border:1px dashed rgba(128,128,128,.35);border-radius:10px;padding:8px}</style>
 ${blocks.map(([t, s]) => `<h3>${t}</h3><div class="f">${s}</div>`).join('\n')}`
 writeFileSync(new URL('./preview.html', import.meta.url), html)
 console.log('wrote dev/preview.html')

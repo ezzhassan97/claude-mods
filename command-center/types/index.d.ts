@@ -150,6 +150,9 @@ export type After = {
   dismissed: ('know' | 'next' | 'replay')[]
 }
 
+/** This session's goal and its steps, kept up to date after each task. */
+export type Goal = { title: string; steps: { text: string; done: boolean }[]; at: number }
+
 export type Rule = { id: number; rule: string; quote: string; confidence: number }
 
 export type Held = { command: string; title: string; summary: string; lines: { name: string; detail: string }[]; note: string | null; decision: 'run' | 'cancel' | null }
@@ -191,6 +194,7 @@ declare module 'claude-code' {
       ticket: Ticket | null
       sessions: Beat[]
       after: After | null
+      goal: Goal | null
       rules: Rule[]
       held: Held | null
       toggles: Toggles
