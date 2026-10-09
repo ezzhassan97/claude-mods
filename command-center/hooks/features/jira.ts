@@ -12,6 +12,27 @@ import type { Io } from '../lib/io'
 
 export const JIRA_SITE = 'nawy.atlassian.net'
 
+/** The error a ticket carries when the session's permissions refused the lookup. */
+export const BLOCKED = "This session's permissions blocked the Jira lookup."
+
+/**
+ * Allow the read-only "get Jira issue" lookup of each Atlassian connector in
+ * ~/.claude/settings.json (permissions.allow), then load the ticket again.
+ * Only run from the button the person presses; nothing else is added.
+ */
+export async function allowJira(io: Io): Promise<void> {
+  const names = await io.mcpTools('__getJiraIssue')
+  if (!names.length) return io.toast('No Atlassian connector in this session')
+  const path = `${await io.home()}/.claude/settings.json`
+  const settings = json<{ permissions?: { allow?: string[] } } & Record<string, unknown>>(await io.read(path).catch(() => '{}'))
+  if (!settings) return io.toast("Couldn't read ~/.claude/settings.json, so nothing was changed")
+  const allow = settings.permissions?.allow ?? []
+  const added = names.filter(n => !allow.includes(n))
+  if (added.length) await io.write(path, `${JSON.stringify({ ...settings, permissions: { ...settings.permissions, allow: [...allow, ...added] } }, null, 2)}\n`)
+  io.toast(added.length ? `Allowed ${added.length} read-only Jira lookup${added.length > 1 ? 's' : ''} in ~/.claude/settings.json` : 'Jira lookups were already allowed')
+  await refreshTicket(io)
+}
+
 type Issue = {
   key: string
   webUrl?: string
@@ -78,7 +99,13 @@ async function fetchIssue(io: Io, key: string): Promise<Issue> {
   // The newer Atlassian connector leaves out sub-tasks and comments, so the one that sends them wins.
   const result = await io.mcp('__getJiraIssue', { cloudId: JIRA_SITE, issueIdOrKey: key, fields: ['summary', 'status', 'issuetype', 'description', 'subtasks', 'comment'], responseContentFormat: 'markdown' }, r => !!issueOf(r)?.fields.subtasks)
   const issue = issueOf(result)
-  if (!issue) throw new Error(`Jira: ${clean(payload<{ error?: string; message?: string }>(result)?.message ?? JSON.stringify(result).slice(0, 200), 160)}`)
+  if (!issue) {
+    const r = result as { isError?: boolean; content?: { text?: string }[] } | null
+    const text = r?.isError ? (r.content ?? []).map(c => c.text ?? '').join(' ').replace(/^HooksError:\s*command-center:\s*/, '') : (payload<{ message?: string }>(result)?.message ?? JSON.stringify(result))
+    // a plugin's connector call goes through the session's permission check like Claude's own
+    if (/refused/i.test(text)) throw new Error(BLOCKED)
+    throw new Error(clean(text, 200))
+  }
   return issue
 }
 

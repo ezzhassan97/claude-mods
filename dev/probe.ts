@@ -38,6 +38,7 @@ const io: Io = {
   fork: async () => null,
   complete: async () => null,
   mcp: async () => (jiraFixture ? JSON.parse(fs.readFileSync(jiraFixture, 'utf8')) : null),
+  mcpTools: async () => [],
   suggest: () => undefined,
   fill: async () => true,
   toast: t => console.log('toast:', t),

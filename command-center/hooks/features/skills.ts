@@ -65,10 +65,15 @@ export async function refreshKit(io: Io): Promise<void> {
     })
     .sort((a, b) => (a.scope === b.scope ? a.name.localeCompare(b.name) : a.scope === 'project' ? -1 : 1))
 
-  // This project's skills: the session's folder and the folders above it, up to home.
+  // This project's skills: the session's working folder and its root, and the folders above them, up to home.
+  const dirs: string[] = []
+  for (const start of [me.cwd, me.root]) {
+    for (let dir = start; dir.startsWith(home) && dir !== home; dir = dir.split('/').slice(0, -1).join('/')) if (!dirs.includes(dir)) dirs.push(dir)
+  }
   const projectSkills: KitSkill[] = []
-  for (let dir = me.root; dir.startsWith(home) && dir !== home; dir = dir.split('/').slice(0, -1).join('/')) {
-    projectSkills.push(...(await skillsIn(io, `${dir}/.claude/skills`, dir === me.root ? '' : dir.slice(home.length + 1))))
+  for (const dir of dirs) {
+    const found = await skillsIn(io, `${dir}/.claude/skills`, projectSkills.length ? dir.slice(home.length + 1) : '')
+    projectSkills.push(...found.filter(f => !projectSkills.some(p => p.name === f.name)))
   }
   const kit: Kit = {
     plugins,

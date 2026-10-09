@@ -5,7 +5,7 @@ import { issueOf, parseRequirements, payload } from '../hooks/features/jira'
 import { commandOf } from '../hooks/features/skills'
 import { looksLikeCorrection } from '../hooks/features/reflect'
 import { pick, sightings, startArgs } from '../hooks/lib/focus'
-import { money, ticketKey } from '../hooks/lib/fmt'
+import { dur, money, ticketKey } from '../hooks/lib/fmt'
 import { fit, width } from '../hooks/lib/svg'
 import { isLastBlock, squash } from '../hooks/views/cards'
 import { diffPage } from '../hooks/views/draw'
@@ -79,6 +79,8 @@ describe('jira, reflect, formatting', () => {
     expect(width('MySQL', 11)).toBeGreaterThan(width('mysql', 11))
     expect(fit('IMS-2423-Masterplan-Amenities-Enhancements', 100, 12, { mono: true }).endsWith('…')).toBe(true)
     expect(money(1.234)).toBe('$1.23')
+    expect(dur(232.5 * 3600_000)).toBe('9d 16h')
+    expect(dur(90 * 60_000)).toBe('1h 30m')
     expect(ticketKey('IMS-2423-Masterplan')).toBe('IMS-2423')
   })
 })

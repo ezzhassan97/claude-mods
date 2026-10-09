@@ -32,6 +32,8 @@ export type Io = {
   /** A tool on a connected MCP server, found by its name suffix (`__getJiraIssue`). */
   /** Calls the tool on each connected server that has it, in turn, until `accept` takes the answer (the last one otherwise). */
   mcp: (toolSuffix: string, args: Record<string, unknown>, accept?: (result: unknown) => boolean) => Promise<unknown>
+  /** The session's MCP tool names ending in `suffix` (one per connected server that has it). */
+  mcpTools: (toolSuffix: string) => Promise<string[]>
   suggest: (text: string) => void
   fill: (text: string) => Promise<boolean>
   toast: (text: string, ms?: number) => void

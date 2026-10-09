@@ -5,7 +5,7 @@ import type { Elements, RenderElement, RenderSurface } from 'claude-code'
 
 import { CONTROLS, flip } from '../features/controls'
 import { checkConflicts, markSeen, refreshFocusPrs, refreshMine } from '../features/prs'
-import { refreshTicket } from '../features/jira'
+import { allowJira, BLOCKED, refreshTicket } from '../features/jira'
 import { refreshKit } from '../features/skills'
 import { refreshAll } from '../features/refresh'
 import { me } from '../features/session'
@@ -220,7 +220,11 @@ export async function panelView(io: Io, E: Table, surface: RenderSurface, cols: 
         sections.push(
           <Box key="jira-err" flexDirection="column">
             <Text color="error" wrap="wrap">{`Couldn't load ${ticket.key}: ${ticket.error}`}</Text>
-            <Button key="jira-retry" label="Retry" onPress={() => void refreshTicket(io)} />
+            {ticket.error === BLOCKED ? <Text dimColor wrap="wrap">{"Claude asks before a plugin uses a connector, like it does for its own tools. Allowing adds only the read-only “get Jira issue” lookup to ~/.claude/settings.json."}</Text> : null}
+            <Box columnGap={1}>
+              {ticket.error === BLOCKED ? <Button key="jira-allow" variant="primary" label="Allow read-only Jira lookups" onPress={() => void allowJira(io)} /> : null}
+              <Button key="jira-retry" label="Retry" onPress={() => void refreshTicket(io)} />
+            </Box>
           </Box>,
         )
       }
