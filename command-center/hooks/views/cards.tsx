@@ -91,10 +91,10 @@ export async function cardsView(io: Io, E: Table, surface: RenderSurface, cols: 
         after.next.map((n, i) => (
           <Box key={`next-row-${i}`} flexDirection="row" alignItems="center" justifyContent="space-between" columnGap={1}>
             <Box flexGrow={1} flexShrink={1} minWidth={0}>
-              {Svg ? <Svg width={inner - 90} source={drawNextRow(n, i, inner - 90)} alt={`${i + 1}. ${n.label}: ${n.prompt}`} /> : <Text wrap="truncate-end">{`${i + 1}. ${n.label} — ${n.prompt}`}</Text>}
+              {Svg ? <Svg width={inner - 50} source={drawNextRow(n, i, inner - 50)} alt={`${i + 1}. ${n.label}: ${n.prompt}`} /> : <Text wrap="truncate-end">{`${i + 1}. ${n.label} — ${n.prompt}`}</Text>}
             </Box>
             <Box flexShrink={0}>
-              <Button key={`next-${i}`} label="Use" onPress={() => void takeNext(io, n)} />
+              <Button key={`next-${i}`} plain label="→" onPress={() => void takeNext(io, n)} />
             </Box>
           </Box>
         )),

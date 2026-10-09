@@ -110,7 +110,7 @@ export function drawNextHead(w: number): string {
 /** One suggestion row: its number, label and the prompt it writes. */
 export function drawNextRow(n: { label: string; prompt: string }, i: number, w: number): string {
   const c = new Canvas(w, 54)
-  c.line([{ t: String(i + 1), color: INK.blue, bold: true, size: 12.5 }, { t: n.label, bold: true, size: 13 }, { t: n.prompt === n.label ? '' : n.prompt, cls: 'm', size: 12, grow: true }], [], 24)
+  c.line([{ t: String(i + 1), color: INK.blue, bold: true, size: 12.5 }, { t: n.label, bold: true, size: 13 }, { t: n.prompt === n.label ? '' : n.prompt, cls: 'm', size: 12, grow: true }], [], 30)
   return c.svg()
 }
 
