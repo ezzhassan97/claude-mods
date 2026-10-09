@@ -1,11 +1,11 @@
-import type { After, Agent, Beat, Branch, Deploy, Edit, Env, Focus, Github, Goal, Held, Pr, Rule, Status, Ticket, Touch, Usage } from '../../types'
+import type { After, Agent, Beat, Branch, Deploy, Edit, Env, Focus, Github, Goal, Pr, Rule, Status, Ticket, Touch, Usage } from '../../types'
 import { ago, basename, dirname, dur, money, plural, tokens } from '../lib/fmt'
 import { Canvas, INK, loadInk, statusInk } from '../lib/svg'
 import type { Seg } from '../lib/svg'
 
 // Every desktop drawing of the command center, as pure functions from state
 // to one SVG string: the bar above the prompt, the three cards (after a turn,
-// reflect, guard) and each section of the side panel. Buttons are not drawn
+// reflect) and each section of the side panel. Buttons are not drawn
 // here; the views put real Buttons beside or under these pictures.
 
 const SIDE_LABEL: Record<Branch['side'], string> = { frontend: 'FE', backend: 'BE', repo: '⎇' }
@@ -132,19 +132,6 @@ export function drawRule(r: Rule, w: number, target: string): string {
   c.text(`“${r.rule}”`, { size: 14.5, lines: 3 })
   c.text(`From what you said: “${r.quote}”`, { cls: 's', size: 12, lines: 2 })
   c.text(`Goes to ${target}`, { cls: 'm', size: 11.5, lines: 1 })
-  c.space(6)
-  return c.svg()
-}
-
-/** A risky command held until you answer. */
-export function drawHeld(h: Held, w: number): string {
-  const c = new Canvas(w, 0, { icon: h.title === 'Recursive delete' ? 'trash' : 'shield', ink: INK.red }).space(12)
-  c.label(`Held · ${h.title}`, 'waiting for you', INK.red)
-  c.line([{ t: h.command, mono: true, size: 13, bold: true, grow: true }], [], 22)
-  c.text(h.summary, { color: INK.red, size: 14, lines: 2 })
-  if (h.note) c.text(h.note, { cls: 's', size: 12, lines: 2 })
-  for (const l of h.lines.slice(0, 6)) c.line([{ t: l.name, mono: true, size: 12, cls: 't', grow: true }], [{ t: l.detail, cls: 's', size: 11.5 }], 19)
-  if (h.lines.length > 6) c.text(`+${h.lines.length - 6} more`, { cls: 'm', size: 11.5, lines: 1 })
   c.space(6)
   return c.svg()
 }

@@ -155,10 +155,9 @@ export type Goal = { title: string; steps: { text: string; done: boolean }[]; at
 
 export type Rule = { id: number; rule: string; quote: string; confidence: number }
 
-export type Held = { command: string; title: string; summary: string; lines: { name: string; detail: string }[]; note: string | null; decision: 'run' | 'cancel' | null }
 
 /** `builtinKnow` is Anthropic's built-in mod (cc-plugin-you-should-know), the rest are this mod's. */
-export type Toggles = { next: boolean; know: boolean; builtinKnow: boolean; replay: boolean; reflect: boolean; guard: boolean }
+export type Toggles = { next: boolean; know: boolean; builtinKnow: boolean; replay: boolean; reflect: boolean }
 
 export type Panel = { tab: string; replay: number | null; showAllPrs: boolean; isPicking: boolean }
 
@@ -196,7 +195,6 @@ declare module 'claude-code' {
       after: After | null
       goal: Goal | null
       rules: Rule[]
-      held: Held | null
       toggles: Toggles
       panel: Panel
     }

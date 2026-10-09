@@ -17,7 +17,7 @@ One Claude Code mod, `command-center`: what each session is on, at a glance, in 
 - **GitHub**: this session's PRs, with review state, comments, commits someone else pushed, how far behind the base and main, checks, conflicts (and which files), and the deploy after a merge. Your other PRs are folded underneath.
 - **Jira**: status, the requirements checklist, bugs, code review and testing sub-tasks, the latest comment.
 - **Vercel**: deployments of this branch, when there are any.
-- **Controls**: switches for Next actions, What you should know, Replay, Reflect, the guard, and the card after each task. They're remembered across sessions.
+- **Controls**: switches for Next actions, What you should know, Replay, Reflect and the card after each task. They're remembered across sessions.
 
 **After each task**, a card shows:
 - how long it took, the tools used, lines changed and cost;
@@ -26,15 +26,6 @@ One Claude Code mod, `command-center`: what each session is on, at a glance, in 
 - up to three **next actions** (press 1–3 to put one in the prompt box).
 
 **Reflect**: when you correct Claude, a card offers to save it as a rule, for this project (its CLAUDE.md) or for all projects (~/.claude/CLAUDE.md).
-
-**Guard**: a risky command (force-push, hard reset, discard, git clean, branch delete, PR merge, rm -rf, destructive SQL) waits on a card. The card shows what it would delete or drop, with Run it / Cancel. In ims-nawy the repo's rules are enforced:
-- PRs go into staging only, Mazen is the only reviewer, and the description must be complete.
-- No merges, no merging staging into a branch, no pushes to shared branches.
-- The shared checkouts keep their branch.
-- GitHub calls carry the nawy account's token.
-- MySQL schema changes wait for a yes and say whether they hit staging or local.
-
-Commands: `/cc` (open or close the panel), `/cc refresh`, `/cc standup [days]`, `/replay`.
 
 ## Install
 

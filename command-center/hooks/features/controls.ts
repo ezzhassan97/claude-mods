@@ -3,7 +3,7 @@ import { json } from '../lib/io'
 import type { Io } from '../lib/io'
 
 // The Controls section's switches: what each does, in plain words, and how
-// it is turned on and off. Six of them are this mod's own and take effect at
+// it is turned on and off. Five of them are this mod's own and take effect at
 // once; "while working" is Anthropic's built-in "You should know" plugin,
 // switched with Claude Code's own `claude plugin enable/disable`.
 
@@ -15,7 +15,6 @@ export const CONTROLS: { key: keyof Toggles; name: string; what: string }[] = [
   { key: 'next', name: "What's next", what: 'After an answer, up to 3 likely next prompts; press 1–3 to put one in the prompt box (nothing is sent for you).' },
   { key: 'replay', name: 'Replay', what: 'After a task that edited files, a card to step through every edit as a diff, in order.' },
   { key: 'reflect', name: 'Reflect', what: 'When you correct Claude ("no, we always…"), offer to save it as a rule in CLAUDE.md, for this project or all.' },
-  { key: 'guard', name: 'Guard risky commands', what: 'Hold rm -rf, force-push, hard reset, discard, branch delete and PR merge on a card until you press Run it.' },
 ]
 
 /** Claude Code's own binary: the desktop app's newest bundled one, else `claude` on PATH. */

@@ -3,8 +3,8 @@
 // Run: npx -y tsx dev/preview.ts && open dev/preview.html
 import { writeFileSync } from 'node:fs'
 
-import type { After, Agent, Beat, Edit, Env, Focus, Github, Held, Pr, Rule, Ticket, Touch, Usage } from '../command-center/types'
-import { drawAgents, drawBar, drawDeploys, drawFiles, drawHeld, drawJira, drawKnow, drawNextHead, drawNextRow, drawOverview, drawPr, drawPrList, drawReplay, drawRule, drawTimeline, drawToggle } from '../command-center/hooks/views/draw'
+import type { After, Agent, Beat, Edit, Env, Focus, Github, Pr, Rule, Ticket, Touch, Usage } from '../command-center/types'
+import { drawAgents, drawBar, drawDeploys, drawFiles, drawJira, drawKnow, drawNextHead, drawNextRow, drawOverview, drawPr, drawPrList, drawReplay, drawRule, drawTimeline, drawToggle } from '../command-center/hooks/views/draw'
 import { CONTROLS } from '../command-center/hooks/features/controls'
 
 const now = Date.parse('2026-10-09T18:00:00Z')
@@ -71,7 +71,6 @@ const others: Beat[] = [
 ]
 const after: After = { turnId: 't', state: 'ready', durationMs: 42_000, tools: 12, files: ['a', 'b', 'c', 'd'], added: 120, removed: 30, costUsd: 0.31, edits: 4, know: ['The pin-drop link now writes to the shared staging DB — the 3 test amenities you dropped are real rows.', 'amenity.mapper.ts is used by 14 files in 4 modules; the PR note should say so.'], next: [{ label: 'Run the amenities tests', prompt: 'Run the amenities tests in the frontend worktree' }, { label: 'Open the PRs', prompt: '/ims-end masterplan-amenities' }, { label: 'Fix the overlapping counter bug', prompt: 'Fix IMS-2430: overlapping names hide the counter' }], dismissed: [] }
 const rule: Rule = { id: 1, rule: 'Use pnpm instead of npm for package management in this project.', quote: 'no - in this repo we always use pnpm, not npm', confidence: 0.95 }
-const held: Held = { command: 'rm -rf build', title: 'Recursive delete', summary: 'deletes 9 files · 286 KB — none tracked by git, so they cannot be restored', note: 'in demo-app', decision: null, lines: [{ name: 'build/assets/vendor.81d3aa.js', detail: '79 KB' }, { name: 'build/assets/app.4f9c2e.js', detail: '63 KB' }, { name: 'build/assets/vendor.81d3aa.js.map', detail: '35 KB' }, { name: 'build/assets/styles.c07b1d.css', detail: '29 KB' }] }
 const edits: Edit[] = [
   { id: 1, turnId: 't', path: '/x/README.md', tool: 'Edit', before: '`greet(name)`', after: '`welcome(name)`', added: 1, removed: 1, at: now },
   { id: 2, turnId: 't', path: '/x/src/greet.js', tool: 'Edit', before: 'export const greet', after: 'export const welcome', added: 1, removed: 1, at: now },
@@ -92,7 +91,6 @@ const blocks: [string, string][] = [
   ['Card · what\'s next (head)', drawNextHead(W)],
   ...after.next.map((n, i): [string, string] => [`Card · what's next row ${i + 1}`, drawNextRow(n, i, W - 90)]),
   ['Card · reflect', drawRule(rule, W, './CLAUDE.md')],
-  ['Card · guard', drawHeld(held, W)],
   ['Panel · overview', drawOverview({ ...bar, agents, startedAt: now - 47 * min, now, others, goal: { title: 'Masterplan amenities enhancements', steps: [{ text: 'Touchpad zoom and wider range', done: true }, { text: 'Amenity names on the masterplan', done: true }, { text: 'Collapsible amenities column', done: false }, { text: 'Test on staging and open the PRs', done: false }], at: now } }, P)],
   ['Panel · agents', drawAgents(agents, P, now)],
   ['Panel · files', drawFiles({ activity: { verb: 'editing', target: touched[0]!.path }, branch: 'IMS-2423-Masterplan-Amenities-Enhancements', changed: 3, touched, root: '/x/ims-nawy/.worktrees' }, P)],

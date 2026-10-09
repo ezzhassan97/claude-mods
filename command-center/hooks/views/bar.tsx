@@ -4,15 +4,14 @@
 import type { Elements, RenderElement, RenderSurface } from 'claude-code'
 
 import { takeNext } from '../features/after'
-import { decide } from '../features/guard'
 import { dropRule, saveRule } from '../features/reflect'
 import { me } from '../features/session'
 import { dur, money, plural, trunc } from '../lib/fmt'
 import type { Io } from '../lib/io'
-import { drawBar, drawHeld, drawKnow, drawNextHead, drawNextRow, drawReplay, drawRule, prFor, prLook } from './draw'
+import { drawBar, drawKnow, drawNextHead, drawNextRow, drawReplay, drawRule, prFor, prLook } from './draw'
 
 // The band above the prompt. From the top: whatever other plugins draw there
-// (Anthropic's built-in "You should know" notes), a held command (guard), a
+// (Anthropic's built-in "You should know" notes), a
 // rule to save (reflect), then the cards of the task just finished, each its
 // own (you should know, replay, what's next), and last the fixed bar:
 // this session's ticket, branches, environment, PRs, progress and usage, with
@@ -33,25 +32,13 @@ export const barWidth = (cols: number): number => Math.max(260, cardWidth(cols) 
 export async function bandView(io: Io, E: Table, surface: RenderSurface, props: { isWorking: boolean; bodyColumns: number; maxRows: number }, below: RenderElement): Promise<RenderElement> {
   const { Box, Text, Button } = E
   const Svg = surface === 'desktop' && 'Svg' in E ? (E as Elements['desktop']).Svg : null
-  const [held, rules, after, toggles, focus, env, ticket, github, usage, status, edits, home] = [
-    await io.s.held.get(), await io.s.rules.get(), await io.s.after.get(), await io.s.toggles.get(), await io.s.focus.get(), await io.s.env.get(),
+  const [rules, after, toggles, focus, env, ticket, github, usage, status, edits, home] = [
+    await io.s.rules.get(), await io.s.after.get(), await io.s.toggles.get(), await io.s.focus.get(), await io.s.env.get(),
     await io.s.ticket.get(), await io.s.github.get(), await io.s.usage.get(), await io.s.status.get(), await io.s.edits.get(), await io.home(),
   ]
   const w = cardWidth(props.bodyColumns)
   const bw = barWidth(props.bodyColumns)
   const parts: RenderElement[] = [below]
-
-  if (held) {
-    parts.push(
-      <Box key="held" flexDirection="column" marginBottom={1}>
-        {Svg ? <Svg width={w} source={drawHeld(held, w)} alt={`Held: ${held.command} — ${held.summary}`} /> : <Text color="error" wrap="wrap">{`⚠ ${held.title}: ${held.command} — ${held.summary}`}</Text>}
-        <Box columnGap={1}>
-          <Button key="held-run" variant="primary" hotkey="1" label={held.title === 'Recursive delete' && held.lines.length ? `Delete ${plural(held.lines.length, 'file')}` : 'Run it'} onPress={() => void decide(io, 'run')} />
-          <Button key="held-cancel" hotkey="2" autoFocus label="Cancel" onPress={() => void decide(io, 'cancel')} />
-        </Box>
-      </Box>,
-    )
-  }
 
   const rule = toggles.reflect ? rules[0] : undefined
   if (rule) {

@@ -1,7 +1,7 @@
 {
   "name": "command-center",
   "version": "0.2.0",
-  "description": "What this session is on, at a glance, in any project: a bar above the prompt (ticket, branches and commits, worktree, environment, PRs, progress, usage), one side panel (overview, agents, files, GitHub, Jira, Vercel, controls), a card after each task (replay, what you should know, next actions), reflect, and a guard for risky commands. Enforces ims-nawy's rules inside ims-nawy.",
+  "description": "What this session is on, at a glance, in any project: a bar above the prompt (ticket, branches and commits, worktree, environment, PRs, progress, usage), one side panel (overview, agents, files, GitHub, Jira, Vercel, controls), a card after each task (replay, what you should know, next actions), reflect,. Enforces ims-nawy's rules inside ims-nawy.",
   "author": {
     "name": "Ezz Hassan"
   },

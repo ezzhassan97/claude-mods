@@ -7,7 +7,6 @@ import type { EngineInterface, Register } from 'claude-code'
 import type { Github, Requirement, Toggles } from '../types'
 import { turnFinished } from './features/after'
 import { readBuiltinKnow } from './features/controls'
-import { guardCommand } from './features/guard'
 import { impactAfterTool } from './features/impact'
 import { checklistText, REQUIREMENTS_TOOL, refreshTicket, requirementsTool, ticketContext } from './features/jira'
 import { refreshMine } from './features/prs'
@@ -22,11 +21,11 @@ import { panelView } from './views/panel'
 
 // Command Center: what this session is on, at a glance, in every project.
 // The bar above the prompt, one side panel, the card after each task (replay,
-// what you should know, next actions), reflect, and the guard. This is the
+// what you should know, next actions), and reflect. This is the
 // only file that touches `$` (the engine follows `$` within one file and
 // reads state atoms where they are declared), so it builds `io` for the rest.
 
-const DEFAULT_TOGGLES: Toggles = { next: true, know: true, builtinKnow: true, replay: true, reflect: true, guard: true }
+const DEFAULT_TOGGLES: Toggles = { next: true, know: true, builtinKnow: true, replay: true, reflect: true }
 const EMPTY_GITHUB: Github = { focus: [], mine: [], deploys: [], at: 0, isLoading: false, error: null }
 const BUDGET_USD = 10
 
@@ -46,7 +45,6 @@ const sessionsA = atom({ plugin: 'command-center', key: 'sessions' } as const, [
 const afterA = atom({ plugin: 'command-center', key: 'after' } as const, null)
 const goalA = atom({ plugin: 'command-center', key: 'goal' } as const, null)
 const rulesA = atom({ plugin: 'command-center', key: 'rules' } as const, [])
-const heldA = atom({ plugin: 'command-center', key: 'held' } as const, null)
 const togglesA = atom({ plugin: 'command-center', key: 'toggles' } as const, DEFAULT_TOGGLES)
 const panelA = atom({ plugin: 'command-center', key: 'panel' } as const, { tab: 'overview', replay: null, showAllPrs: false, isPicking: false })
 
@@ -68,7 +66,6 @@ function cells($: EngineInterface): Cells {
     after: { get: () => read($, afterA), set: async c => void (await update($, afterA, c)) },
     goal: { get: () => read($, goalA), set: async c => void (await update($, goalA, c)) },
     rules: { get: () => read($, rulesA), set: async c => void (await update($, rulesA, c)) },
-    held: { get: () => read($, heldA), set: async c => void (await update($, heldA, c)) },
     toggles: { get: () => read($, togglesA), set: async c => void (await update($, togglesA, c)) },
     panel: { get: () => read($, panelA), set: async c => void (await update($, panelA, c)) },
   }
@@ -252,20 +249,6 @@ export const register: Register = on => {
     if (e.notification_type === 'permission_prompt' || e.notification_type === 'elicitation_dialog') await setStatus(makeIo($), 'waiting', e.message.slice(0, 120))
     return next(e)
   })
-
-  // The guard first: a risky command waits on its card for Run it / Cancel.
-  on('tool.call', { tool: 'Bash' }, async ($, e, next) => {
-    const toggles = await read($, togglesA)
-    const env = await read($, envA)
-    const verdict = await guardCommand(makeIo($), String(e.command ?? ''), {
-      cwd: await $.session.cwd(),
-      imsRoot: ws.imsRoot,
-      dbMode: env?.dbMode ?? null,
-      isOn: toggles.guard,
-      isAborted: () => next.signal.aborted,
-    })
-    return verdict ?? next(e)
-  }).catch(($, e, next) => (next.called || next.error.kind === 're-entry' ? next(e) : { deny: 'The command center guard failed while checking this command, so it did not run. Tell the user.' }))
 
   on('tool.call', async ($, e, next) => {
     const io = makeIo($)
