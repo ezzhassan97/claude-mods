@@ -96,8 +96,9 @@ export function issueOf(result: unknown): Issue | null {
 }
 
 async function fetchIssue(io: Io, key: string): Promise<Issue> {
-  // The newer Atlassian connector leaves out sub-tasks and comments, so the one that sends them wins.
-  const result = await io.mcp('__getJiraIssue', { cloudId: JIRA_SITE, issueIdOrKey: key, fields: ['summary', 'status', 'issuetype', 'description', 'subtasks', 'comment'], responseContentFormat: 'markdown' }, r => !!issueOf(r)?.fields.subtasks)
+  // The Atlassian (Rovo) connector: view "full" carries sub-tasks and comments (a `fields` list would override the
+  // view). A connector that rejects or answers without sub-tasks is passed over for the next one.
+  const result = await io.mcp('__getJiraIssue', { cloudId: JIRA_SITE, issueIdOrKey: key, view: 'full', responseContentFormat: 'markdown' }, r => !!issueOf(r)?.fields.subtasks)
   const issue = issueOf(result)
   if (!issue) {
     const r = result as { isError?: boolean; content?: { text?: string }[] } | null
