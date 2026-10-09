@@ -9,7 +9,7 @@ import { dropRule, saveRule } from '../features/reflect'
 import { me } from '../features/session'
 import { dur, plural, trunc } from '../lib/fmt'
 import type { Io } from '../lib/io'
-import { drawKnow, drawNextHead, drawNextRow, drawReplay, drawRule, NEXT_ROW_HEIGHT } from './draw'
+import { drawKnow, drawNextHead, drawNextRow, drawReplay, drawRule } from './draw'
 
 // The cards of the task just finished, drawn under Claude's last reply in the
 // conversation, each its own card with its own buttons: you should know,
@@ -91,7 +91,7 @@ export async function cardsView(io: Io, E: Table, surface: RenderSurface, cols: 
         after.next.map((n, i) => (
           <Box key={`next-row-${i}`} flexDirection="row" alignItems="center" justifyContent="space-between" columnGap={1}>
             <Box flexGrow={1} flexShrink={1} minWidth={0}>
-              {Svg ? <Svg isInteractive width={inner - 84} height={NEXT_ROW_HEIGHT} source={drawNextRow(n, i, inner - 84)} alt={`${i + 1}. ${n.label}: ${n.prompt}`} /> : <Text wrap="truncate-end">{`${i + 1}. ${n.label} — ${n.prompt}`}</Text>}
+              {Svg ? <Svg width={inner - 84} source={drawNextRow(n, i, inner - 84)} alt={`${i + 1}. ${n.label}: ${n.prompt}`} /> : <Text wrap="truncate-end">{`${i + 1}. ${n.label} — ${n.prompt}`}</Text>}
             </Box>
             <Box flexShrink={0} columnGap={1}>
               <Button key={`next-copy-${i}`} plain dimColor label="⧉" onPress={() => void io.copy(n.prompt, surface).then(ok => io.toast(ok ? 'Copied' : "Couldn't copy", 2000))} />

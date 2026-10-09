@@ -24,7 +24,7 @@ One Claude Code mod, `command-center`: what each session is on, at a glance, in 
 **After each task**, under Claude's reply, each its own card:
 - **You should know**: risks, side effects, assumptions, decisions left to you.
 - **Replay**: the edits of that task; opens them in the panel one diff at a time, Previous/Next always in view.
-- **What's next**: up to three likely next prompts: → puts one in the prompt box, ⧉ copies it, and hovering one shows it whole (nothing is sent).
+- **What's next**: up to three likely next prompts: → puts one in the prompt box, ⧉ copies it (nothing is sent).
 
 **Reflect**: when you correct Claude, a card under the reply offers to save it as a rule, for this project (its CLAUDE.md) or for all projects (~/.claude/CLAUDE.md).
 

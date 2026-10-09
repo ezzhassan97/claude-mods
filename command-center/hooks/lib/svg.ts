@@ -119,7 +119,6 @@ export type Frame = { icon: Icon; ink: string; bare?: boolean } | { bar: true }
 
 export class Canvas {
   private parts: string[] = []
-  private tip = ''
   y = 0
   readonly pad: number
   constructor(readonly w: number, pad = 0, private readonly frame?: Frame) {
@@ -234,12 +233,6 @@ export class Canvas {
   }
 
   /** Raw SVG drawn at the current y, `h` tall. */
-  /** A tooltip for the whole drawing (shown on hover where the Svg is drawn `isInteractive`). */
-  tooltip(text: string): this {
-    this.tip = text
-    return this
-  }
-
   /** Markup drawn where it says, without moving down (a rail beside rows already drawn). */
   overlay(markup: string): this {
     this.parts.push(markup)
@@ -270,7 +263,7 @@ export class Canvas {
     } else if (this.frame) {
       back = `<rect class="bar" x=".5" y=".5" width="${this.w - 1}" height="${h - 1}" rx="10" stroke-width="1"/>`
     }
-    return `<svg xmlns="http://www.w3.org/2000/svg" width="${this.w}" height="${h}" viewBox="0 0 ${this.w} ${h}">${this.tip ? `<title>${esc(this.tip)}</title>` : ''}<style>${STYLE}</style>${back}${this.parts.join('')}</svg>`
+    return `<svg xmlns="http://www.w3.org/2000/svg" width="${this.w}" height="${h}" viewBox="0 0 ${this.w} ${h}"><style>${STYLE}</style>${back}${this.parts.join('')}</svg>`
   }
 
   get height(): number {

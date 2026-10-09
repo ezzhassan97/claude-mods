@@ -107,13 +107,10 @@ export function drawNextHead(w: number): string {
   return c.space(Math.max(4, 46 - c.height)).svg() // room for the icon badge
 }
 
-/** A What's next row's height, in px. The row is drawn in a frame (for its hover tooltip) that needs an explicit height, or it defaults to ~150px. */
-export const NEXT_ROW_HEIGHT = 30
-
 /** One suggestion row: its number, label and the prompt it writes. */
 export function drawNextRow(n: { label: string; prompt: string }, i: number, w: number): string {
-  const c = new Canvas(w, 54).tooltip(n.prompt === n.label ? n.label : `${n.label}: ${n.prompt}`)
-  c.line([{ t: String(i + 1), color: INK.blue, bold: true, size: 12.5 }, { t: n.label, bold: true, size: 13 }, { t: n.prompt === n.label ? '' : n.prompt, cls: 'm', size: 12, grow: true }], [], NEXT_ROW_HEIGHT)
+  const c = new Canvas(w, 54)
+  c.line([{ t: String(i + 1), color: INK.blue, bold: true, size: 12.5 }, { t: n.label, bold: true, size: 13 }, { t: n.prompt === n.label ? '' : n.prompt, cls: 'm', size: 12, grow: true }], [], 30)
   return c.svg()
 }
 
