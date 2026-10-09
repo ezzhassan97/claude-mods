@@ -35,21 +35,35 @@ export async function cardsView(io: Io, E: Table, surface: RenderSurface, cols: 
   const close = (card: 'know' | 'next' | 'replay') => (): void => void io.s.after.set(a => (a ? { ...a, dismissed: [...a.dismissed, card] } : a))
   const isLoading = after.state === 'loading'
   const cards: RenderElement[] = []
+  // Every card is the same frame: the drawing, then its buttons inside, bottom right.
+  const inner = w - 40
+  const card = (key: string, picture: RenderElement, buttons: RenderElement[], rows: RenderElement[] = []): RenderElement => (
+    <Box key={key} flexDirection="column" alignSelf="flex-start" borderStyle="round" borderColor="inactive" paddingX={1} marginTop={1} width={Svg ? undefined : Math.min(cols, 100)}>
+      {picture}
+      {rows}
+      {buttons.length ? (
+        <Box justifyContent="flex-end" columnGap={1}>
+          {buttons}
+        </Box>
+      ) : null}
+    </Box>
+  )
 
   if (toggles.know && !after.dismissed.includes('know') && (isLoading || after.know.length)) {
     cards.push(
-      <Box key="know" flexDirection="column" marginTop={1}>
-        {Svg ? <Svg width={w} source={drawKnow(after.know, w, isLoading)} alt={`You should know: ${after.know.join(' ')}`} /> : <Box flexDirection="column">{isLoading ? <Text dimColor>💡 You should know · thinking…</Text> : after.know.map((k, i) => <Text key={`k-${i}`} color="warning" wrap="wrap">{`💡 ${k}`}</Text>)}</Box>}
-        {isLoading ? null : (
-          <Box columnGap={1}>
-            <Button key="know-more" label="Tell me more" onPress={() => {
-                close('know')()
-                void io.fill(`Tell me more about what I should know from that task: ${after.know.join(' ')}`)
-              }} />
-            <Button key="know-ok" plain dimColor label="Got it" onPress={close('know')} />
-          </Box>
-        )}
-      </Box>,
+      card(
+        'know',
+        Svg ? <Svg width={inner} source={drawKnow(after.know, inner, isLoading)} alt={`You should know: ${after.know.join(' ')}`} /> : <Box flexDirection="column">{isLoading ? <Text dimColor>💡 You should know · thinking…</Text> : after.know.map((k, i) => <Text key={`k-${i}`} color="warning" wrap="wrap">{`💡 ${k}`}</Text>)}</Box>,
+        isLoading
+          ? []
+          : [
+              <Button key="know-ok" plain dimColor label="Got it" onPress={close('know')} />,
+              <Button key="know-more" label="Tell me more" onPress={() => {
+                  close('know')()
+                  void io.fill(`Tell me more about what I should know from that task: ${after.know.join(' ')}`)
+                }} />,
+            ],
+      ),
     )
   }
 
@@ -57,35 +71,34 @@ export async function cardsView(io: Io, E: Table, surface: RenderSurface, cols: 
   if (toggles.replay && turnEdits.length && !after.dismissed.includes('replay')) {
     const first = edits.indexOf(turnEdits[0]!)
     cards.push(
-      <Box key="replay" flexDirection="column" marginTop={1}>
-        {Svg ? <Svg width={w} source={drawReplay({ ...after, edits: turnEdits.length }, [...new Set(turnEdits.map(e => e.path))], w)} alt={`${turnEdits.length} edits ready to replay`} /> : <Text color="claude">{`▶ ${plural(turnEdits.length, 'edit')} ready to replay · ${dur(after.durationMs)}`}</Text>}
-        <Box columnGap={1}>
-          <Button key="replay-go" variant="primary" label="Replay edits" onPress={() => void io.s.panel.set(p => ({ ...p, replay: Math.max(0, first), replayLine: 0 })).then(() => io.togglePane(true))} />
-          <Button key="replay-close" plain dimColor label="Dismiss" onPress={close('replay')} />
-        </Box>
-      </Box>,
+      card(
+        'replay',
+        Svg ? <Svg width={inner} source={drawReplay({ ...after, edits: turnEdits.length }, [...new Set(turnEdits.map(e => e.path))], inner)} alt={`${turnEdits.length} edits ready to replay`} /> : <Text color="claude">{`▶ ${plural(turnEdits.length, 'edit')} ready to replay · ${dur(after.durationMs)}`}</Text>,
+        [
+          <Button key="replay-close" plain dimColor label="Dismiss" onPress={close('replay')} />,
+          <Button key="replay-go" variant="primary" label="Replay edits" onPress={() => void io.s.panel.set(p => ({ ...p, replay: Math.max(0, first), replayLine: 0 })).then(() => io.togglePane(true))} />,
+        ],
+      ),
     )
   }
 
   if (toggles.next && after.next.length && !after.dismissed.includes('next')) {
-    // A framed box is the card, so each option's small button sits inside it.
     cards.push(
-      <Box key="next" flexDirection="column" borderStyle="round" borderColor="inactive" paddingX={1} marginTop={1} width={Svg ? undefined : Math.min(cols, 100)}>
-        {Svg ? <Svg width={w - 40} source={drawNextHead(w - 40)} alt="What's next" /> : <Text color="suggestion">What's next · goes into your prompt box, nothing is sent</Text>}
-        {after.next.map((n, i) => (
+      card(
+        'next',
+        Svg ? <Svg width={inner} source={drawNextHead(inner)} alt="What's next" /> : <Text color="suggestion">What's next · goes into your prompt box, nothing is sent</Text>,
+        [<Button key="next-close" plain dimColor label="Dismiss" onPress={close('next')} />],
+        after.next.map((n, i) => (
           <Box key={`next-row-${i}`} flexDirection="row" alignItems="center" justifyContent="space-between" columnGap={1}>
             <Box flexGrow={1} flexShrink={1} minWidth={0}>
-              {Svg ? <Svg width={w - 130} source={drawNextRow(n, i, w - 130)} alt={`${i + 1}. ${n.label}: ${n.prompt}`} /> : <Text wrap="truncate-end">{`${i + 1}. ${n.label} — ${n.prompt}`}</Text>}
+              {Svg ? <Svg width={inner - 90} source={drawNextRow(n, i, inner - 90)} alt={`${i + 1}. ${n.label}: ${n.prompt}`} /> : <Text wrap="truncate-end">{`${i + 1}. ${n.label} — ${n.prompt}`}</Text>}
             </Box>
             <Box flexShrink={0}>
               <Button key={`next-${i}`} label="Use" onPress={() => void takeNext(io, n)} />
             </Box>
           </Box>
-        ))}
-        <Box justifyContent="flex-end">
-          <Button key="next-close" plain dimColor label="Dismiss" onPress={close('next')} />
-        </Box>
-      </Box>,
+        )),
+      ),
     )
   }
 
@@ -94,14 +107,15 @@ export async function cardsView(io: Io, E: Table, surface: RenderSurface, cols: 
     const project = `${focus?.root ?? me.root}/CLAUDE.md`
     const name = `${focus?.project ?? 'this project'}/CLAUDE.md`
     cards.push(
-      <Box key={`rule-${rule.id}`} flexDirection="column" marginTop={1}>
-        {Svg ? <Svg width={w} source={drawRule(rule, w, `${trunc(name, 40)} or ~/.claude/CLAUDE.md`)} alt={`Save this as a rule? ${rule.rule}`} /> : <Text color="success" wrap="wrap">{`Save this as a rule? “${rule.rule}”`}</Text>}
-        <Box columnGap={1} flexWrap="wrap">
-          <Button key="rule-project" variant="primary" label="Save for this project" onPress={() => void saveRule(io, rule, project, name)} />
-          <Button key="rule-global" label="Save for all projects" onPress={() => void saveRule(io, rule, `${home}/.claude/CLAUDE.md`, '~/.claude/CLAUDE.md')} />
-          <Button key="rule-skip" plain dimColor label="Don't save" onPress={() => void dropRule(io, rule.id)} />
-        </Box>
-      </Box>,
+      card(
+        `rule-${rule.id}`,
+        Svg ? <Svg width={inner} source={drawRule(rule, inner, `${trunc(name, 40)} or ~/.claude/CLAUDE.md`)} alt={`Save this as a rule? ${rule.rule}`} /> : <Text color="success" wrap="wrap">{`Save this as a rule? “${rule.rule}”`}</Text>,
+        [
+          <Button key="rule-skip" plain dimColor label="Don't save" onPress={() => void dropRule(io, rule.id)} />,
+          <Button key="rule-global" label="Save for all projects" onPress={() => void saveRule(io, rule, `${home}/.claude/CLAUDE.md`, '~/.claude/CLAUDE.md')} />,
+          <Button key="rule-project" variant="primary" label="Save for this project" onPress={() => void saveRule(io, rule, project, name)} />,
+        ],
+      ),
     )
   }
 

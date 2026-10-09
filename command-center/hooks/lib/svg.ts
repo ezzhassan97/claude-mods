@@ -258,7 +258,8 @@ export class Canvas {
   }
 
   svg(): string {
-    const h = Math.ceil(this.y)
+    // an icon badge (cy 28, r 15) needs 46px, however short the content
+    const h = Math.ceil(this.frame && 'icon' in this.frame ? Math.max(this.y, 46) : this.y)
     let back = ''
     if (this.frame && 'icon' in this.frame) {
       const { icon, ink, bare } = this.frame
