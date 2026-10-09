@@ -30,7 +30,8 @@ export type Io = {
   fork: (prompt: string) => Promise<ModelForkResult | null>
   complete: (system: string, prompt: string) => Promise<ModelCompleteResult | null>
   /** A tool on a connected MCP server, found by its name suffix (`__getJiraIssue`). */
-  mcp: (toolSuffix: string, args: Record<string, unknown>) => Promise<unknown>
+  /** Calls the tool on each connected server that has it, in turn, until `accept` takes the answer (the last one otherwise). */
+  mcp: (toolSuffix: string, args: Record<string, unknown>, accept?: (result: unknown) => boolean) => Promise<unknown>
   suggest: (text: string) => void
   fill: (text: string) => Promise<boolean>
   toast: (text: string, ms?: number) => void

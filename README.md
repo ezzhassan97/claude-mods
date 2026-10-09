@@ -11,14 +11,15 @@ One Claude Code mod, `command-center`: what each session is on, at a glance, in 
 - **One button, "Open ▸"**, for the side panel.
 
 **The side panel**: one panel, with tabs:
-- **Overview**: context, tokens, cost and time; the ticket; each branch with its last commit; the worktree, its ports, the tunnels and the database; "change worktree" when the guess is wrong.
-- **Sessions**: the other sessions open in this folder: what each is on, whether it's working, idle or needs you, its context and cost.
+- **Overview**: context, tokens, cost, time and the session's goal with its steps, then one compact row per tab (Jira, each branch, agents, files, sessions, skills); › opens that tab.
+- **GitHub**: per branch, a diagram like GitHub Desktop's (main, the branch from where it forked with a dot per commit, main's new commits since, staging and the PR into it), the branch's commits (this session's and unpushed ones marked), then the PR: review, comments, checks, conflicts and the deploy after merging.
+- **Jira**: status, the requirements checklist, bugs, code review and testing sub-tasks, the latest comment; an error says why, with Retry.
 - **Agents**: each subagent, its type and model, tools, tokens, context, time.
-- **Files**: what Claude is doing right now, and every file touched, with lines added/removed and "used by N" (how many files import it).
-- **GitHub**: this session's PRs, with review state, comments, commits someone else pushed, how far behind the base and main, checks, conflicts (and which files), and the deploy after a merge. Your other PRs are folded underneath.
-- **Jira**: status, the requirements checklist, bugs, code review and testing sub-tasks, the latest comment.
+- **Files**: what Claude is doing right now, and every file touched, with lines added/removed and "used by N".
+- **Sessions**: the other sessions open in this folder: what each is on, working, idle or needing you, context and cost.
+- **Skills & plugins**: skills and slash commands this session used, this project's skills, the plugins on (for this project or everywhere) with their commands, your global skills.
 - **Vercel**: deployments of this branch, when there are any.
-- **Controls**: switches for What you should know, Next actions, Replay and Reflect. They're remembered across sessions.
+- **Controls**: switches for What you should know, Next actions, Replay and Reflect.
 
 **After each task**, under Claude's reply, each its own card:
 - **You should know**: risks, side effects, assumptions, decisions left to you.

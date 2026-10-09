@@ -1,7 +1,8 @@
 import { describe, expect, mock, test } from 'claude-code/testing'
 import type { On } from 'claude-code'
 
-import { parseRequirements, payload } from '../hooks/features/jira'
+import { issueOf, parseRequirements, payload } from '../hooks/features/jira'
+import { commandOf } from '../hooks/features/skills'
 import { looksLikeCorrection } from '../hooks/features/reflect'
 import { pick, sightings, startArgs } from '../hooks/lib/focus'
 import { money, ticketKey } from '../hooks/lib/fmt'
@@ -57,6 +58,18 @@ describe('jira, reflect, formatting', () => {
     expect(parseRequirements(story)).toEqual(['Zoom with the touchpad', 'Amenity names', 'AI Detect'])
     expect(payload<{ key: string }>({ content: [{ type: 'text', text: '[IMPORTANT: move to v2] {"key":"IMS-1"}' }] })?.key).toBe('IMS-1')
   })
+  test('reads a ticket from either Atlassian connector', () => {
+    const wrap = (o: unknown) => ({ content: [{ type: 'text', text: JSON.stringify(o) }] })
+    const fields = { summary: 'Masterplan Amenities Enhancements', status: { name: 'To Do' } }
+    expect(issueOf(wrap({ data: { key: 'IMS-2423', fields } }))?.fields.summary).toBe('Masterplan Amenities Enhancements')
+    expect(issueOf(wrap({ issues: { nodes: [{ key: 'IMS-2423', fields: { ...fields, subtasks: [] } }] } }))?.fields.subtasks).toEqual([])
+    expect(issueOf(wrap({ error: 'Issue does not exist' }))).toBe(null)
+  })
+  test('counts the slash commands a prompt runs', () => {
+    expect(commandOf('/ims-start masterplan IMS-2423-X')).toBe('ims-start')
+    expect(commandOf('<command-name>/reload-plugins</command-name>')).toBe('reload-plugins')
+    expect(commandOf('fix the bar')).toBe(null)
+  })
   test('reflect wakes only for corrections', () => {
     expect(looksLikeCorrection('no - in this repo we always use pnpm, not npm')).toBe(true)
     expect(looksLikeCorrection('add a button to the header')).toBe(false)
@@ -96,7 +109,7 @@ describe('views validate on every surface', () => {
     world(on)
     for (const surface of ['terminal', 'desktop'] as const) {
       const ui = await $.ui.mount({ plugin: 'command-center', surface, component: 'Pane', requestId: 'command-center', props: PANE as never })
-      for (const id of ['overview', 'files', 'github', 'controls']) {
+      for (const id of ['overview', 'github', 'jira', 'files', 'sessions', 'skills', 'controls']) {
         await ui.press({ key: `tab-${id}` })
         expect(await ui.find({ key: `tab-${id}` })).toBeDefined()
       }

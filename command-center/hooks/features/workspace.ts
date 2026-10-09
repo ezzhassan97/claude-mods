@@ -66,12 +66,16 @@ async function branchOf(io: Io, root: string, side: Side): Promise<Branch | null
   const base = baseRef.replace(/^origin\//, '')
   const count = async (...range: string[]): Promise<number> => Number((await git(io, root, 'rev-list', '--count', ...range)).out) || 0
   const onBase = branch === base
-  const [commits, behindBase, hasUpstream, dirty, lastLog] = await Promise.all([
+  const hasStaging = (await git(io, root, 'rev-parse', '--verify', '--quiet', 'refs/remotes/origin/staging')).ok
+  const [commits, behindBase, hasUpstream, dirty, lastLog, logOut, stagingAhead, isInStaging] = await Promise.all([
     onBase ? Promise.resolve(0) : count(`${baseRef}..HEAD`),
     onBase ? Promise.resolve(0) : count(`HEAD..${baseRef}`),
     git(io, root, 'rev-parse', '--abbrev-ref', '@{u}').then(r => r.ok),
     git(io, root, 'status', '--porcelain').then(r => r.out.split('\n').filter(Boolean).length),
     git(io, root, 'log', '-1', '--format=%s%x09%ct'),
+    onBase ? Promise.resolve({ out: '' }) : git(io, root, 'log', '-n', '20', '--format=%h%x09%ct%x09%an%x09%s', `${baseRef}..HEAD`),
+    hasStaging ? count('origin/staging..HEAD') : Promise.resolve(0),
+    hasStaging ? git(io, root, 'merge-base', '--is-ancestor', 'HEAD', 'origin/staging').then(r => r.ok) : Promise.resolve(false),
   ])
   const unpushed = hasUpstream ? await count('@{u}..HEAD') : commits
   const [subject = '', ts = '0'] = lastLog.out.split('\t')
@@ -87,6 +91,11 @@ async function branchOf(io: Io, root: string, side: Side): Promise<Branch | null
     behindBase,
     dirty,
     last: subject ? { subject: clean(subject, 120), at: Number(ts) * 1000 } : null,
+    log: logOut.out.split('\n').filter(Boolean).map((line, i) => {
+      const [sha = '', at = '0', author = '', ...rest] = line.split('\t')
+      return { sha, at: Number(at) * 1000, author, subject: clean(rest.join(' '), 120), isPushed: i >= unpushed }
+    }),
+    staging: hasStaging && !onBase ? { ahead: stagingAhead, isIn: isInStaging } : null,
   }
 }
 

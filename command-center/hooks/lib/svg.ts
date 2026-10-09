@@ -20,8 +20,8 @@ export type Ink = (typeof INK)[keyof typeof INK]
 /** Every text size is scaled by this: the desktop draws SVG text larger than the app's own. */
 export const FONT = 0.86
 
-const SANS = "ui-sans-serif, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif"
-const MONO = "ui-monospace, SFMono-Regular, Menlo, monospace"
+export const SANS = "ui-sans-serif, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif"
+export const MONO = "ui-monospace, SFMono-Regular, Menlo, monospace"
 
 const STYLE =
   '.t{fill:#1f1e1d}.s{fill:#6f6d66}.m{fill:#a3a19a}.k{fill:#e9e7df}.tile{fill:#f3f1ea}.ln{stroke:#e4e2da}.card{fill:#fbfaf6;stroke:#e2e0d7}.bar{fill:#f1efe8;stroke:#dedcd2}' +
@@ -240,6 +240,12 @@ export class Canvas {
   }
 
   /** Raw SVG drawn at the current y, `h` tall. */
+  /** Markup drawn where it says, without moving down (a rail beside rows already drawn). */
+  overlay(markup: string): this {
+    this.parts.push(markup)
+    return this
+  }
+
   raw(markup: string, h: number): this {
     this.parts.push(`<g transform="translate(0 ${this.y})">${markup}</g>`)
     this.y += h

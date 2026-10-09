@@ -5,12 +5,16 @@ import type { Elements, RenderElement, RenderSurface } from 'claude-code'
 
 import { CONTROLS, flip } from '../features/controls'
 import { checkConflicts, markSeen, refreshFocusPrs, refreshMine } from '../features/prs'
+import { refreshTicket } from '../features/jira'
+import { refreshKit } from '../features/skills'
 import { refreshAll } from '../features/refresh'
 import { me } from '../features/session'
 import { fixTunnels, pickWorktree } from '../features/workspace'
 import { basename, money, plural, trunc } from '../lib/fmt'
 import type { Io } from '../lib/io'
-import { diffPage, drawAgents, drawDeploys, drawFiles, drawJira, drawOverview, drawPr, drawPrList, drawSessions, drawToggle, prLook } from './draw'
+import type { Seg } from '../lib/svg'
+import { INK, statusInk } from '../lib/svg'
+import { diffPage, drawAgents, drawCommits, drawDeploys, drawFiles, drawGraph, drawJira, drawKit, drawOverview, drawPr, drawPrList, drawRow, drawSessions, drawToggle, prFor, prLook } from './draw'
 
 // The side panel: one panel with tabs (Overview, Sessions, Agents, Files, GitHub,
 // Jira, Vercel when the branch deploys there, Controls); only the selected
@@ -66,7 +70,7 @@ export async function panelView(io: Io, E: Table, surface: RenderSurface, cols: 
   }
 
   // Tabs: one row at the top, only the selected tab's content below.
-  const available = ['overview', 'sessions', 'agents', 'files', 'github', 'jira', ...(github.deploys.length ? ['deploys'] : []), 'controls']
+  const available = ['overview', 'github', 'jira', 'agents', 'files', 'sessions', 'skills', ...(github.deploys.length ? ['deploys'] : []), 'controls']
   const active = available.includes(panel.tab) ? panel.tab : 'overview'
   const isOpen = (id: string): boolean => id === active
   const tabs: { id: string; label: string }[] = []
@@ -90,15 +94,45 @@ export async function panelView(io: Io, E: Table, surface: RenderSurface, cols: 
   // Other sessions open in this folder (a heartbeat without a folder: by project name).
   const others = sessions.filter(o => (o.root ? o.root === me.root : o.project === basename(me.root)))
 
-  // Overview
+  const waiting = others.filter(o => o.status === 'waiting').length
+  const running = agents.filter(a => !a.endedAt).length
+  const changed = touched.filter(t => t.edits).length
+  const hot = github.mine.filter(p => p.state === 'OPEN' && (p.review === 'CHANGES_REQUESTED' || p.mergeable === 'CONFLICTING' || p.newComments)).length
+  const kit = await io.s.kit.get()
+
+  // Overview: the session at a glance, then one row per tab; › opens that tab.
   sections.push(header('overview', 'Overview', status === 'working' ? 'working' : status === 'waiting' ? 'needs you' : 'idle'))
   if (isOpen('overview')) {
     sections.push(
       picture(
-        drawOverview({ focus, env, ticket, github, usage, status, title: ticket?.summary ?? me.title, progress, agents, startedAt: me.startedAt, now, others, goal: await io.s.goal.get() }, w),
+        drawOverview({ focus, env, usage, startedAt: me.startedAt, now, goal: await io.s.goal.get() }, w),
         'Session overview',
         [`${ticket ? `${ticket.key} ${ticket.status} · ` : ''}${focus?.project ?? ''}`, ...(focus?.branches ?? []).map(b => `${b.side}: ${b.branch} · ${plural(b.commits, 'commit')}${b.unpushed ? ` ↑${b.unpushed}` : ''}`), `ctx ${Math.round(usage?.contextPct ?? 0)}% · ${money(usage?.costUsd)}`],
       ),
+    )
+    const rows: { tab: string; label: string; left: Seg[]; right: Seg[]; text: string }[] = []
+    if (focus?.ticket || ticket) {
+      rows.push({ tab: 'jira', label: 'Jira', left: ticket?.summary ? [{ t: ticket.key, bold: true, size: 12 }, { t: ticket.status, pill: statusInk(ticket.status, ticket.category), size: 10 }, { t: ticket.summary, size: 12, cls: 's', grow: true }] : [{ t: focus?.ticket ?? '', bold: true, size: 12 }, { t: ticket?.error ? "couldn't load" : 'loading…', color: ticket?.error ? INK.red : undefined, cls: 'm', size: 11.5 }], right: progress ? [{ t: `${progress.done}/${progress.total} done`, cls: 's', size: 11 }] : [], text: `${ticket?.key ?? focus?.ticket} ${ticket?.status ?? ''}` })
+    }
+    for (const b of focus?.branches ?? []) {
+      const pr = prFor(b, github.focus)
+      rows.push({ tab: 'github', label: b.side === 'frontend' ? 'Frontend' : b.side === 'backend' ? 'Backend' : 'Branch', left: [{ t: b.branch ?? '(detached)', mono: true, size: 11.5, grow: true }], right: [{ t: plural(b.commits, 'commit'), cls: 's', size: 11 }, ...(b.unpushed ? [{ t: `↑${b.unpushed}`, color: INK.amber, size: 11 } as Seg] : []), ...(pr ? [{ t: prLook(pr).text, pill: prLook(pr).color, size: 10 } as Seg] : [{ t: 'no PR', cls: 'm', size: 10.5 } as Seg])], text: `${b.side} ${b.branch}` })
+    }
+    rows.push({ tab: 'agents', label: 'Agents', left: [{ t: agents.length ? `${running} running · ${agents.length - running} done` : 'none yet', cls: agents.length ? 't' : 'm', size: 12, grow: true }], right: [], text: `${running} agents running` })
+    rows.push({ tab: 'files', label: 'Files', left: [{ t: activity ? `${activity.verb} ${basename(activity.target)}` : touched.length ? `last: ${basename(touched[0]!.path)}` : 'nothing touched yet', cls: touched.length ? 't' : 'm', size: 12, grow: true }], right: touched.length ? [{ t: `${plural(touched.length, 'touched')} · ${changed} changed`, cls: 's', size: 11 }] : [], text: `${touched.length} files touched` })
+    rows.push({ tab: 'sessions', label: 'Sessions', left: [{ t: others.length ? plural(others.length, 'other session') : 'only this one here', cls: others.length ? 't' : 'm', size: 12 }, ...(waiting ? [{ t: `${waiting} need${waiting === 1 ? 's' : ''} you`, pill: INK.amber, size: 10 } as Seg] : [])], right: [], text: `${others.length} other sessions` })
+    if (kit) rows.push({ tab: 'skills', label: 'Skills', left: [{ t: kit.used.length ? kit.used.slice(0, 3).map(u => (u.count > 1 ? `${u.name} ×${u.count}` : u.name)).join(' · ') : 'none used yet', cls: kit.used.length ? 't' : 'm', size: 12, grow: true }], right: [{ t: plural(kit.plugins.length, 'plugin'), cls: 's', size: 11 }], text: `${kit.used.length} skills used` })
+    sections.push(
+      <Box key="ov-rows" flexDirection="column" marginTop={1}>
+        {rows.map(r => (
+          <Box key={`ov-${r.tab}-${r.text}`} flexDirection="row" alignItems="center" justifyContent="space-between" columnGap={1}>
+            <Box flexGrow={1} flexShrink={1} minWidth={0}>
+              {Svg ? <Svg width={w - 44} source={drawRow(r.label, r.left, r.right, w - 44)} alt={`${r.label}: ${r.text}`} /> : <Text wrap="truncate-end">{`${r.label}: ${r.text}`}</Text>}
+            </Box>
+            <Button key={`ov-go-${r.tab}-${r.text}`} plain dimColor label="›" onPress={() => void io.s.panel.set(p => ({ ...p, tab: r.tab }))} />
+          </Box>
+        ))}
+      </Box>,
     )
     const actions: RenderElement[] = []
     if (focus?.isIms) actions.push(<Button key="ov-pick" plain dimColor label={focus.worktree ? 'change worktree' : 'pick the worktree'} onPress={() => void io.s.panel.set(p => ({ ...p, isPicking: !p.isPicking }))} />)
@@ -118,15 +152,21 @@ export async function panelView(io: Io, E: Table, surface: RenderSurface, cols: 
   }
 
   // Sessions
-  const waiting = others.filter(o => o.status === 'waiting').length
   sections.push(header('sessions', 'Sessions', others.length ? `${plural(others.length, 'other session')} in ${basename(me.root)}` : ''))
   if (isOpen('sessions')) {
     if (others.length) sections.push(picture(drawSessions(others, w, now), `${others.length} other sessions`, others.map(o => `${o.status === 'waiting' ? '!' : o.status === 'working' ? '◐' : '·'} ${o.title} · ${o.ticket ?? o.branch ?? ''} · ${o.status}`)))
     else sections.push(<Text key="sessions-empty" dimColor wrap="wrap">{`No other session is open in ${basename(me.root)}. Sessions show here once they have loaded the command center (new ones do; open ones after /reload-plugins).`}</Text>)
   }
 
+  // Skills & plugins
+  sections.push(header('skills', 'Skills & plugins', kit ? `${plural(kit.plugins.length, 'plugin')} on · ${plural(kit.projectSkills.length + kit.globalSkills.length, 'skill')}` : ''))
+  if (isOpen('skills')) {
+    if (kit) sections.push(picture(drawKit(kit, w), 'Skills and plugins', [`Used: ${kit.used.map(u => `${u.name} ×${u.count}`).join(', ') || 'none'}`, `Project skills: ${kit.projectSkills.map(x => x.name).join(', ') || 'none'}`, `Plugins: ${kit.plugins.map(p => p.name).join(', ')}`]))
+    else sections.push(<Text key="kit-loading" dimColor italic>Reading skills and plugins…</Text>)
+    sections.push(<Button key="kit-refresh" plain dimColor label="refresh" onPress={() => void refreshKit(io)} />)
+  }
+
   // Agents
-  const running = agents.filter(a => !a.endedAt).length
   sections.push(header('agents', 'Agents', agents.length ? `${running} running · ${agents.length - running} done` : ''))
   if (isOpen('agents') && !agents.length) sections.push(<Text key="agents-empty" dimColor wrap="wrap">No agents in this session yet. When Claude hands work to a subagent, it shows here with its task, model, tools, tokens and time.</Text>)
   {
@@ -134,7 +174,6 @@ export async function panelView(io: Io, E: Table, surface: RenderSurface, cols: 
   }
 
   // Files
-  const changed = touched.filter(t => t.edits).length
   sections.push(header('files', 'Files', `${plural(touched.length, 'touched')}${changed ? ` · ${changed} changed` : ''}`))
   if (isOpen('files')) {
     if (activity || touched.length) {
@@ -144,19 +183,23 @@ export async function panelView(io: Io, E: Table, surface: RenderSurface, cols: 
   }
 
   // GitHub
-  const hot = github.mine.filter(p => p.state === 'OPEN' && (p.review === 'CHANGES_REQUESTED' || p.mergeable === 'CONFLICTING' || p.newComments)).length
   sections.push(header('github', 'GitHub', `${plural(github.focus.length, 'PR')} here${github.mine.length ? ` · ${github.mine.filter(p => p.state === 'OPEN').length} open overall` : ''}${hot ? ` · ${hot} need you` : ''}`))
   if (isOpen('github')) {
-    if (!github.focus.length) sections.push(<Text key="gh-none" dimColor italic>{focus?.branches.length ? 'No PR for this branch yet.' : 'No branch in view.'}</Text>)
-    for (const pr of github.focus) {
+    if (!focus?.branches.length) sections.push(<Text key="gh-none" dimColor italic>No git branch in view for this session.</Text>)
+    for (const b of focus?.branches ?? []) {
+      const pr = prFor(b, github.focus)
       sections.push(
-        <Box key={`pr-${pr.url}`} flexDirection="column" marginTop={1}>
-          {picture(drawPr(pr, w, now), `${pr.repo} #${pr.number}: ${prLook(pr).text}`, [`${prLook(pr).text} ${pr.title}`, pr.lastComment ? `${pr.lastComment.author}: ${pr.lastComment.text}` : ''])}
-          <Box columnGap={2} flexWrap="wrap">
-            <Link href={pr.url} label={`Open #${pr.number} on GitHub`} />
-            {pr.mergeable === 'CONFLICTING' && !pr.conflictFiles ? <Button key={`pr-conf-${pr.number}`} plain dimColor label="which files conflict?" onPress={() => void checkConflicts(io, pr.url)} /> : null}
-            {pr.newComments ? <Button key={`pr-seen-${pr.number}`} plain dimColor label="mark comments read" onPress={() => void markSeen(io, pr.url)} /> : null}
-          </Box>
+        <Box key={`br-${b.root}`} flexDirection="column" marginTop={1}>
+          {picture(drawGraph(b, pr, w, me.startedAt), `${b.side} ${b.branch}: ${b.commits} commits, ${b.behindBase} new on ${b.base}${pr ? `, ${prLook(pr).text}` : ''}`, [`${b.side}: ${b.branch} · ${plural(b.commits, 'commit')} · main +${b.behindBase}`])}
+          {b.log.length ? picture(drawCommits(b, w, now, me.startedAt), `${b.log.length} commits`, b.log.slice(0, 12).map(k => `${k.isPushed ? '●' : '○'} ${k.subject} · ${k.sha}`)) : null}
+          {pr ? picture(drawPr(pr, w, now), `${pr.repo} #${pr.number}: ${prLook(pr).text}`, [`${prLook(pr).text} ${pr.title}`, pr.lastComment ? `${pr.lastComment.author}: ${pr.lastComment.text}` : '']) : null}
+          {pr ? (
+            <Box columnGap={2} flexWrap="wrap">
+              <Link href={pr.url} label={`Open #${pr.number} on GitHub`} />
+              {pr.mergeable === 'CONFLICTING' && !pr.conflictFiles ? <Button key={`pr-conf-${pr.number}`} plain dimColor label="which files conflict?" onPress={() => void checkConflicts(io, pr.url)} /> : null}
+              {pr.newComments ? <Button key={`pr-seen-${pr.number}`} plain dimColor label="mark comments read" onPress={() => void markSeen(io, pr.url)} /> : null}
+            </Box>
+          ) : null}
         </Box>,
       )
     }
@@ -173,11 +216,18 @@ export async function panelView(io: Io, E: Table, surface: RenderSurface, cols: 
   if (isOpen('jira') && !focus?.ticket && !ticket) sections.push(<Text key="jira-empty" dimColor wrap="wrap">No Jira ticket for this session: its branch names none (an IMS branch like IMS-2423-… does). Start work with /ims-start and the story, requirements, bugs and comments show here.</Text>)
   if (focus?.ticket || ticket) {
     if (isOpen('jira')) {
-      if (ticket?.error && !ticket.summary) sections.push(<Text key="jira-err" color="error" wrap="wrap">{ticket.error}</Text>)
-      if (ticket) {
+      if (ticket?.error) {
+        sections.push(
+          <Box key="jira-err" flexDirection="column">
+            <Text color="error" wrap="wrap">{`Couldn't load ${ticket.key}: ${ticket.error}`}</Text>
+            <Button key="jira-retry" label="Retry" onPress={() => void refreshTicket(io)} />
+          </Box>,
+        )
+      }
+      if (ticket?.summary) {
         sections.push(picture(drawJira(ticket, w, now), `${ticket.key} ${ticket.status}`, [`${ticket.key} ${ticket.status} · ${ticket.summary}`, ...ticket.requirements.map(r => `${r.state === 'open' ? '○' : '✓'} ${r.text}`)]))
         sections.push(<Link key="jira-link" href={ticket.url} label="Open in Jira" />)
-      } else sections.push(<Text key="jira-loading" dimColor italic>Loading the ticket…</Text>)
+      } else if (!ticket?.error) sections.push(<Text key="jira-loading" dimColor italic>Loading the ticket…</Text>)
     }
   }
 
@@ -223,7 +273,7 @@ export async function panelView(io: Io, E: Table, surface: RenderSurface, cols: 
   return (
     <Box flexDirection="column">
       <Box key="tabs" flexWrap="wrap" columnGap={1}>
-        {tabs.map((t, i) => (
+        {[...tabs].sort((a, b) => available.indexOf(a.id) - available.indexOf(b.id)).map((t, i) => (
           <Button key={`tab-${t.id}`} hotkey={String(i + 1)} plain={t.id === active ? undefined : true} variant={t.id === active ? 'primary' : undefined} dimColor={t.id === active ? undefined : true} label={`${t.label}${badge[t.id] ?? ''}`} onPress={() => void io.s.panel.set(p => ({ ...p, tab: t.id }))} />
         ))}
       </Box>

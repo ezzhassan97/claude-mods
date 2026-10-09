@@ -52,7 +52,13 @@ export type Branch = {
   behindBase: number
   dirty: number
   last: { subject: string; at: number } | null
+  /** The branch's own commits, newest first (at most 20). */
+  log: Commit[]
+  /** Against origin/staging, when the repo has one: commits not in it yet, and whether the tip is already in it. */
+  staging: { ahead: number; isIn: boolean } | null
 }
+
+export type Commit = { sha: string; subject: string; at: number; author: string; isPushed: boolean }
 
 /** What this session is on. */
 export type Focus = {
@@ -163,6 +169,18 @@ export type Toggles = { next: boolean; know: boolean; builtinKnow: boolean; repl
 
 export type Panel = { tab: string; replay: number | null; replayLine: number; showAllPrs: boolean; isPicking: boolean }
 
+/** A skill folder (SKILL.md): its name, the first line of what it does, and the folder above this project it comes from ('' = here). */
+export type KitSkill = { name: string; description: string; where: string }
+
+/** Skills & plugins for this session. */
+export type Kit = {
+  plugins: { name: string; market: string; scope: 'user' | 'project'; commands: string[] }[]
+  projectSkills: KitSkill[]
+  globalSkills: KitSkill[]
+  used: { name: string; count: number }[]
+  at: number
+}
+
 /** One Claude Code session, as its heartbeat file says (any project). */
 export type Beat = {
   id: string
@@ -196,6 +214,7 @@ declare module 'claude-code' {
       github: Github
       ticket: Ticket | null
       sessions: Beat[]
+      kit: Kit | null
       after: After | null
       goal: Goal | null
       rules: Rule[]

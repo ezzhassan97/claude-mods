@@ -18,7 +18,7 @@ type Issue = {
   fields: {
     summary: string
     status: { name: string; statusCategory?: { key: string } }
-    issuetype: { name: string }
+    issuetype?: { name: string }
     description?: unknown
     subtasks?: { key: string; fields: { summary: string; status: { name: string; statusCategory?: { key: string } }; issuetype: { name: string } } }[]
     comment?: { comments: { author?: { displayName?: string }; created: string; body: unknown }[] }
@@ -67,11 +67,19 @@ export function parseRequirements(markdown: string): string[] {
   return items
 }
 
-async function fetchIssue(io: Io, key: string): Promise<Issue | null> {
-  const result = await io.mcp('__getJiraIssue', { cloudId: JIRA_SITE, issueIdOrKey: key, fields: ['summary', 'status', 'issuetype', 'description', 'subtasks', 'comment'], responseContentFormat: 'markdown' })
-  // The connector answers `{ issues: { nodes: [issue] } }`; older versions the bare issue.
-  const found = payload<Issue & { issues?: { nodes?: Issue[] } }>(result)
-  return found?.issues?.nodes?.[0] ?? (found?.fields ? found : null)
+/** The issue in a connector's answer: `{ issues: { nodes: [issue] } }`, `{ data: issue }` or the bare issue. */
+export function issueOf(result: unknown): Issue | null {
+  const found = payload<Issue & { issues?: { nodes?: Issue[] }; data?: Issue }>(result)
+  const issue = found?.issues?.nodes?.[0] ?? found?.data ?? found
+  return issue?.fields ? issue : null
+}
+
+async function fetchIssue(io: Io, key: string): Promise<Issue> {
+  // The newer Atlassian connector leaves out sub-tasks and comments, so the one that sends them wins.
+  const result = await io.mcp('__getJiraIssue', { cloudId: JIRA_SITE, issueIdOrKey: key, fields: ['summary', 'status', 'issuetype', 'description', 'subtasks', 'comment'], responseContentFormat: 'markdown' }, r => !!issueOf(r)?.fields.subtasks)
+  const issue = issueOf(result)
+  if (!issue) throw new Error(`Jira: ${clean(payload<{ error?: string; message?: string }>(result)?.message ?? JSON.stringify(result).slice(0, 200), 160)}`)
+  return issue
 }
 
 export async function refreshTicket(io: Io): Promise<void> {
@@ -83,7 +91,6 @@ export async function refreshTicket(io: Io): Promise<void> {
   }
   try {
     const issue = await fetchIssue(io, key)
-    if (!issue?.fields) throw new Error('Jira did not answer (is the Atlassian connector connected?)')
     const f = issue.fields
     const saved = ((await io.storeGet(`req:${key}`)) as Record<string, Requirement['state']> | undefined) ?? {}
     const texts = parseRequirements(typeof f.description === 'string' ? f.description : textOf(f.description))
@@ -92,7 +99,7 @@ export async function refreshTicket(io: Io): Promise<void> {
       summary: clean(f.summary, 140),
       status: f.status.name,
       category: f.status.statusCategory?.key ?? '',
-      type: f.issuetype.name,
+      type: f.issuetype?.name ?? '',
       url: issue.webUrl ?? `https://${JIRA_SITE}/browse/${key}`,
       subs: (f.subtasks ?? []).map(s => ({ key: s.key, summary: clean(s.fields.summary, 110), status: s.fields.status.name, isDone: s.fields.status.statusCategory?.key === 'done', kind: kindOf(s.fields.summary, s.fields.issuetype.name) })),
       comments: (f.comment?.comments ?? []).slice(-5).map(c => ({ author: c.author?.displayName ?? 'someone', text: clean(textOf(c.body), 240), at: c.created })),
@@ -102,7 +109,8 @@ export async function refreshTicket(io: Io): Promise<void> {
     }
     await io.s.ticket.set(() => ticket)
   } catch (error) {
-    await io.s.ticket.set(t => (t?.key === key ? { ...t, error: clean(String(error), 160) } : null))
+    const message = clean(String(error).replace(/^Error: /, ''), 160)
+    await io.s.ticket.set(t => (t?.key === key ? { ...t, error: message } : { key, summary: '', status: '', category: '', type: '', url: `https://${JIRA_SITE}/browse/${key}`, subs: [], comments: [], requirements: [], at: 0, error: message }))
   }
 }
 
@@ -113,7 +121,7 @@ export async function ticketContext(io: Io, key: string): Promise<string | null>
   const f = issue.fields
   const description = typeof f.description === 'string' ? f.description : textOf(f.description)
   const subs = (f.subtasks ?? []).map(s => `- ${s.key} ${s.fields.summary} (${s.fields.status.name})`).join('\n')
-  return [`<jira-ticket key="${key}">`, `${key} · ${f.issuetype.name} · ${f.status.name}`, `Summary: ${f.summary}`, '', description.slice(0, 4000), subs ? `\nSub-tasks:\n${subs}` : '', '</jira-ticket>'].join('\n')
+  return [`<jira-ticket key="${key}">`, `${key} · ${f.issuetype?.name ?? 'Issue'} · ${f.status.name}`, `Summary: ${f.summary}`, '', description.slice(0, 4000), subs ? `\nSub-tasks:\n${subs}` : '', '</jira-ticket>'].join('\n')
 }
 
 export const REQUIREMENTS_TOOL = {

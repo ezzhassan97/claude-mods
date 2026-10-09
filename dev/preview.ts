@@ -4,7 +4,8 @@
 import { writeFileSync } from 'node:fs'
 
 import type { After, Agent, Beat, Edit, Env, Focus, Github, Pr, Rule, Ticket, Touch, Usage } from '../command-center/types'
-import { drawAgents, drawBar, drawDeploys, drawFiles, drawJira, drawKnow, drawNextHead, drawNextRow, drawOverview, drawPr, drawPrList, drawSessions, drawReplay, drawRule, drawToggle } from '../command-center/hooks/views/draw'
+import { drawAgents, drawBar, drawCommits, drawGraph, drawKit, drawRow, drawDeploys, drawFiles, drawJira, drawKnow, drawNextHead, drawNextRow, drawOverview, drawPr, drawPrList, drawSessions, drawReplay, drawRule, drawToggle } from '../command-center/hooks/views/draw'
+import { INK } from '../command-center/hooks/lib/svg'
 import { CONTROLS } from '../command-center/hooks/features/controls'
 
 const now = Date.parse('2026-10-09T18:00:00Z')
@@ -32,8 +33,21 @@ const github: Github = {
 const focus: Focus = {
   project: 'ims-nawy', root: '/x/ims-nawy', isIms: true, worktree: 'masterplan-amenities', isPicked: false, ticket: 'IMS-2423',
   branches: [
-    { side: 'frontend', root: '/x/ims-nawy/.worktrees/masterplan-amenities-frontend', name: 'frontend', remote: 'NawyRE/nawy-inventory-frontend', branch: 'IMS-2423-Masterplan-Amenities-Enhancements', base: 'main', commits: 4, unpushed: 1, behindBase: 9, dirty: 0, last: { subject: 'IMS-2423: group overlapping amenity names', at: now - 25 * min } },
-    { side: 'backend', root: '/x/ims-nawy/.worktrees/masterplan-amenities-backend', name: 'backend', remote: 'NawyRE/nawy-inventory-backend', branch: 'IMS-2423-Masterplan-Amenities-Enhancements', base: 'main', commits: 3, unpushed: 0, behindBase: 9, dirty: 2, last: { subject: 'IMS-2423: link amenity on pin drop', at: now - 70 * min } },
+    { side: 'frontend', root: '/x/ims-nawy/.worktrees/masterplan-amenities-frontend', name: 'frontend', remote: 'NawyRE/nawy-inventory-frontend', branch: 'IMS-2423-Masterplan-Amenities-Enhancements', base: 'main', commits: 4, unpushed: 1, behindBase: 9, dirty: 0, last: { subject: 'IMS-2423: group overlapping amenity names', at: now - 25 * min },
+      log: [
+        { sha: 'a91c3e2', subject: 'IMS-2423: group overlapping amenity names', at: now - 25 * min, author: 'Ezz Hassan', isPushed: false },
+        { sha: '7d02f1b', subject: 'IMS-2423: collapsible amenities column', at: now - 40 * min, author: 'Ezz Hassan', isPushed: true },
+        { sha: '3be9a04', subject: 'IMS-2423: touchpad zoom and wider range', at: now - 300 * min, author: 'Ezz Hassan', isPushed: true },
+        { sha: 'e1f7c55', subject: 'IMS-2423: amenity names on the masterplan', at: now - 26 * 60 * min, author: 'Mazen Fayez', isPushed: true },
+      ],
+      staging: { ahead: 4, isIn: false } },
+    { side: 'backend', root: '/x/ims-nawy/.worktrees/masterplan-amenities-backend', name: 'backend', remote: 'NawyRE/nawy-inventory-backend', branch: 'IMS-2423-Masterplan-Amenities-Enhancements', base: 'main', commits: 3, unpushed: 0, behindBase: 9, dirty: 2, last: { subject: 'IMS-2423: link amenity on pin drop', at: now - 70 * min },
+      log: [
+        { sha: 'c44d2a9', subject: 'IMS-2423: link amenity on pin drop', at: now - 70 * min, author: 'Ezz Hassan', isPushed: true },
+        { sha: '19ab7e0', subject: 'IMS-2423: amenity area lookup', at: now - 28 * 60 * min, author: 'Ezz Hassan', isPushed: true },
+        { sha: '0f3c6d1', subject: 'IMS-2423: amenities endpoint', at: now - 30 * 60 * min, author: 'Ezz Hassan', isPushed: true },
+      ],
+      staging: { ahead: 0, isIn: true } },
   ],
 }
 const env: Env = { mysql: true, mongo: true, redis: true, dbPort: 3308, dbMode: 'staging', fe: { port: 9006, up: true }, be: { port: 3006, up: true }, checkedAt: now }
@@ -91,7 +105,14 @@ const blocks: [string, string][] = [
   ['Card · what\'s next (head)', drawNextHead(W)],
   ...after.next.map((n, i): [string, string] => [`Card · what's next row ${i + 1}`, drawNextRow(n, i, W - 90)]),
   ['Card · reflect', drawRule(rule, W, './CLAUDE.md')],
-  ['Panel · overview', drawOverview({ ...bar, agents, startedAt: now - 47 * min, now, others, goal: { title: 'Masterplan amenities enhancements', steps: [{ text: 'Touchpad zoom and wider range', done: true }, { text: 'Amenity names on the masterplan', done: true }, { text: 'Collapsible amenities column', done: false }, { text: 'Test on staging and open the PRs', done: false }], at: now } }, P)],
+  ['Panel · overview', drawOverview({ focus, env, usage, startedAt: now - 47 * min, now, goal: { title: 'Masterplan amenities enhancements', steps: [{ text: 'Touchpad zoom and wider range', done: true }, { text: 'Amenity names on the masterplan', done: true }, { text: 'Collapsible amenities column', done: false }, { text: 'Test on staging and open the PRs', done: false }], at: now } }, P)],
+  ['Overview · row jira', drawRow('Jira', [{ t: 'IMS-2423', bold: true, size: 12 }, { t: 'In Progress', pill: INK.amber, size: 10 }, { t: 'Masterplan Amenities Enhancements', size: 12, cls: 's', grow: true }], [{ t: '3/5 done', cls: 's', size: 11 }], P - 44)],
+  ['Overview · row branch', drawRow('Frontend', [{ t: 'IMS-2423-Masterplan-Amenities-Enhancements', mono: true, size: 11.5, grow: true }], [{ t: '4 commits', cls: 's', size: 11 }, { t: '↑1', color: INK.amber, size: 11 }, { t: '#812 approved', pill: INK.green, size: 10 }], P - 44)],
+  ['Overview · row agents', drawRow('Agents', [{ t: '1 running · 2 done', size: 12, grow: true }], [], P - 44)],
+  ['GitHub · graph FE', drawGraph(focus.branches[0]!, focusPrs[0]!, P, now - 47 * min)],
+  ['GitHub · commits FE', drawCommits(focus.branches[0]!, P, now, now - 47 * min)],
+  ['GitHub · graph BE (in staging)', drawGraph(focus.branches[1]!, focusPrs[1]!, P, now - 47 * min)],
+  ['Skills & plugins', drawKit({ used: [{ name: 'ims-start', count: 2 }, { name: 'plugin-authoring', count: 1 }, { name: 'reload-plugins', count: 4 }], projectSkills: [{ name: 'ims-start', description: 'Start or resume a piece of IMS work: Jira story, branch and worktree copies', where: '' }, { name: 'uat-start', description: 'UAT an IMS story on staging', where: '' }, { name: 'new-project', description: 'Create anything new under ~/main', where: 'Main' }], plugins: [{ name: 'command-center', market: 'ezz-mods', scope: 'user', commands: ['cc', 'replay'] }, { name: 'superpowers', market: 'claude-plugins-official', scope: 'user', commands: ['brainstorming', 'writing-plans'] }, { name: 'vercel', market: 'claude-plugins-official', scope: 'project', commands: ['deploy', 'status', 'env'] }], globalSkills: [{ name: 'nawy-story', description: '', where: '' }, { name: 'firecrawl', description: '', where: '' }, { name: 'nawy-demo-video', description: '', where: '' }], at: now }, P)],
   ['Panel · agents', drawAgents(agents, P, now)],
   ['Panel · files', drawFiles({ activity: { verb: 'editing', target: touched[0]!.path }, branch: 'IMS-2423-Masterplan-Amenities-Enhancements', changed: 3, touched, root: '/x/ims-nawy/.worktrees' }, P)],
   ['Panel · GitHub (this PR)', drawPr(focusPrs[1]!, P, now)],

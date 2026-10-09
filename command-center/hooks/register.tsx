@@ -12,6 +12,7 @@ import { checklistText, REQUIREMENTS_TOOL, refreshTicket, requirementsTool, tick
 import { refreshMine } from './features/prs'
 import { looksLikeCorrection, reflect } from './features/reflect'
 import { refreshAll } from './features/refresh'
+import { commandOf, learnUses, noteUse, refreshKit, refreshUses } from './features/skills'
 import { agentSpawned, agentStep, measured, prompted, refreshUsage, sessionEnd, sessionStart, setStatus, toolEnded, toolStarted, turnEnded, turnStarted } from './features/session'
 import { findImsRoot, learnFromHistory, notice, noticeStart, refreshEnv, refreshFocus, ws } from './features/workspace'
 import type { Cells, Io } from './lib/io'
@@ -42,6 +43,7 @@ const envA = atom({ plugin: 'command-center', key: 'env' } as const, null)
 const githubA = atom({ plugin: 'command-center', key: 'github' } as const, EMPTY_GITHUB)
 const ticketA = atom({ plugin: 'command-center', key: 'ticket' } as const, null)
 const sessionsA = atom({ plugin: 'command-center', key: 'sessions' } as const, [])
+const kitA = atom({ plugin: 'command-center', key: 'kit' } as const, null)
 const afterA = atom({ plugin: 'command-center', key: 'after' } as const, null)
 const goalA = atom({ plugin: 'command-center', key: 'goal' } as const, null)
 const rulesA = atom({ plugin: 'command-center', key: 'rules' } as const, [])
@@ -63,6 +65,7 @@ function cells($: EngineInterface): Cells {
     github: { get: () => read($, githubA), set: async c => void (await update($, githubA, c)) },
     ticket: { get: () => read($, ticketA), set: async c => void (await update($, ticketA, c)) },
     sessions: { get: () => read($, sessionsA), set: async c => void (await update($, sessionsA, c)) },
+    kit: { get: () => read($, kitA), set: async c => void (await update($, kitA, c)) },
     after: { get: () => read($, afterA), set: async c => void (await update($, afterA, c)) },
     goal: { get: () => read($, goalA), set: async c => void (await update($, goalA, c)) },
     rules: { get: () => read($, rulesA), set: async c => void (await update($, rulesA, c)) },
@@ -75,7 +78,7 @@ function cells($: EngineInterface): Cells {
 // looked up at their usual homes. ponytail: fixed list; extend if a tool lives elsewhere.
 const HOMES = ['/opt/homebrew/bin', '/usr/local/bin', '/usr/bin', '/bin', '/usr/sbin']
 const bins = new Map<string, string>()
-const mcpTools = new Map<string, string>()
+const mcpTools = new Map<string, string[]>()
 
 function makeIo($: EngineInterface): Io {
   const bin = async (name: string): Promise<string> => {
@@ -119,15 +122,25 @@ function makeIo($: EngineInterface): Io {
     commands: () => $.command.list().catch(() => null),
     fork: prompt => $.model.fork({ prompt }).catch(() => null),
     complete: (system, prompt) => $.model.complete({ model: 'haiku', system, prompt, maxTokens: 300, timeoutMs: 30_000 }).catch(() => null),
-    mcp: async (suffix, args) => {
-      let name = mcpTools.get(suffix)
-      if (!name) {
-        name = (await $.tool.list()).map(t => t.name).find(n => n.startsWith('mcp__') && n.endsWith(suffix))
-        if (!name) throw new Error('No Jira connector in this session (connect Atlassian in claude.ai settings)')
-        mcpTools.set(suffix, name)
+    // Several connectors may offer one tool (two Atlassian ones answer Jira differently):
+    // try each until one gives an answer `accept` takes, and remember it first next time.
+    mcp: async (suffix, args, accept) => {
+      let names = mcpTools.get(suffix)
+      if (!names) {
+        names = (await $.tool.list()).map(t => t.name).filter(n => n.startsWith('mcp__') && n.endsWith(suffix))
+        mcpTools.set(suffix, names)
       }
-      const [, server = '', tool = ''] = name.split('__')
-      return $.mcp.call(server, tool, args)
+      if (!names.length) throw new Error('No Atlassian connector in this session (connect it in claude.ai settings)')
+      let last: unknown = null
+      for (const name of names) {
+        const [, server = '', tool = ''] = name.split('__')
+        last = await $.mcp.call(server, tool, args).catch(error => ({ isError: true, content: [{ type: 'text', text: String(error) }] }))
+        if (!accept || accept(last)) {
+          mcpTools.set(suffix, [name, ...names.filter(n => n !== name)])
+          return last
+        }
+      }
+      return last
     },
     suggest: text => void $.prompt.suggest({ text }).catch(() => undefined),
     fill: async text => (await $.prompt.fill({ text, mode: 'replace' }).catch(() => null))?.isFilled === true,
@@ -176,9 +189,10 @@ export const register: Register = on => {
     ws.imsRoot = await findImsRoot(io, e.cwd)
     if (ws.imsRoot) await $.tool.register(REQUIREMENTS_TOOL).catch(() => undefined)
     void learnFromHistory(io).then(() => refreshAll(io)).then(() => refreshMine(io))
+    void learnUses(io).then(() => refreshKit(io))
     $.clock.every(20_000, () => void refreshFocus(io).then(() => refreshEnv(io)))
     $.clock.every(120_000, () => void refreshAll(io))
-    $.clock.every(300_000, () => void refreshMine(io).then(() => refreshTicket(io)))
+    $.clock.every(300_000, () => void refreshMine(io).then(() => refreshTicket(io)).then(() => refreshKit(io)))
     return result
   })
 
@@ -197,6 +211,8 @@ export const register: Register = on => {
     prompted(e.text)
     notice(e.text)
     const io = makeIo($)
+    const ran = commandOf(e.text)
+    if (ran && noteUse(ran)) void refreshUses(io)
     const toggles = await read($, togglesA)
     if (toggles.reflect && looksLikeCorrection(e.text)) {
       const text = e.text
@@ -254,6 +270,7 @@ export const register: Register = on => {
     const io = makeIo($)
     await toolStarted(io, e)
     const input = e as unknown as Record<string, unknown>
+    if (String(e.tool) === 'Skill' && typeof input.skill === 'string' && noteUse(input.skill)) void refreshUses(io)
     if (String(e.tool) === 'Skill' && input.skill === 'ims-start' && typeof input.args === 'string') noticeStart(input.args)
     const moved = notice(JSON.stringify(input).slice(0, 4000))
     const ran = await next(e)

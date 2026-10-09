@@ -1,6 +1,6 @@
-import type { After, Agent, Beat, Branch, Deploy, Edit, Env, Focus, Github, Goal, Pr, Rule, Status, Ticket, Touch, Usage } from '../../types'
+import type { After, Agent, Beat, Branch, Deploy, Edit, Env, Focus, Github, Goal, Kit, Pr, Rule, Status, Ticket, Touch, Usage } from '../../types'
 import { ago, basename, dirname, dur, money, plural, tokens } from '../lib/fmt'
-import { Canvas, INK, loadInk, statusInk } from '../lib/svg'
+import { Canvas, esc, FONT, INK, loadInk, MONO, SANS, statusInk, width } from '../lib/svg'
 import type { Seg } from '../lib/svg'
 
 // Every desktop drawing of the command center, as pure functions from state
@@ -152,7 +152,8 @@ export function drawToggle(name: string, what: string, isOn: boolean, w: number)
 
 // ---- the side panel's sections
 
-export function drawOverview(d: BarInput & { agents: Agent[]; startedAt: number; now: number; others: Beat[]; goal: Goal | null }, w: number): string {
+/** The top of Overview: usage tiles, the session's goal with its steps, the worktree and its environment. */
+export function drawOverview(d: Pick<BarInput, 'focus' | 'env' | 'usage'> & { startedAt: number; now: number; goal: Goal | null }, w: number): string {
   const c = new Canvas(w, 2)
   c.tiles([
     { label: 'Context', value: d.usage?.contextPct != null ? `${Math.round(d.usage.contextPct)}%` : '—', color: loadInk(d.usage?.contextPct) },
@@ -168,17 +169,6 @@ export function drawOverview(d: BarInput & { agents: Agent[]; startedAt: number;
     for (const step of d.goal.steps) c.line([{ t: step.done ? '✓' : '○', color: step.done ? INK.green : INK.gray, bold: true, size: 12 }, { t: step.text, size: 12, cls: step.done ? 's' : 't', grow: true }], [], 19)
     c.space(6)
   }
-  if (d.ticket) {
-    c.line([{ dot: statusInk(d.ticket.status, d.ticket.category) }, { t: d.ticket.key, bold: true }, { t: d.ticket.status, pill: statusInk(d.ticket.status, d.ticket.category), size: 11 }, { t: d.ticket.summary, grow: true }], [], 22)
-  }
-  for (const b of d.focus?.branches ?? []) {
-    c.line(
-      [{ t: SIDE_LABEL[b.side], pill: b.side === 'frontend' ? INK.teal : b.side === 'backend' ? INK.purple : INK.gray, size: 10.5, bold: true }, { t: b.branch ?? '(detached)', mono: true, size: 12, grow: true }],
-      [{ t: plural(b.commits, 'commit'), cls: 's', size: 11.5 }, ...(b.unpushed ? [{ t: `↑${b.unpushed} unpushed`, color: INK.amber, size: 11.5 } as Seg] : []), ...(b.dirty ? [{ t: `${b.dirty} uncommitted`, color: INK.amber, size: 11.5 } as Seg] : []), ...(b.behindBase ? [{ t: `${b.behindBase} behind ${b.base ?? 'main'}`, cls: 'm', size: 11.5 } as Seg] : [])],
-      21,
-    )
-    if (b.last && b.commits > 0) c.line([{ t: '', size: 10, gap: 0 }, { t: `last: ${b.last.subject}`, cls: 'm', size: 11.5, grow: true }], [{ t: `${ago(b.last.at, d.now)} ago`, cls: 'm', size: 11.5 }], 18)
-  }
   if (d.focus?.worktree || d.env) {
     const segs: Seg[] = []
     if (d.focus?.worktree) segs.push({ t: d.focus.worktree, mono: true, size: 12, cls: 's' })
@@ -193,10 +183,6 @@ export function drawOverview(d: BarInput & { agents: Agent[]; startedAt: number;
         ]
       : []
     c.line(segs, right, 22)
-  }
-  if (d.others.length) {
-    const needYou = d.others.filter(s => s.status === 'waiting').length
-    c.line([{ t: `${plural(d.others.length, 'other session')} in this folder`, cls: 's', size: 12 }, ...(needYou ? [{ t: `${needYou} need${needYou === 1 ? 's' : ''} you`, pill: INK.amber, size: 11 } as Seg] : [])], [{ t: 'see Sessions', cls: 'm', size: 11 }], 20)
   }
   return c.svg()
 }
@@ -344,4 +330,137 @@ export function diffPage(e: Edit, root: string, start: number, room: number): { 
   const before = body.slice(0, from)
   const header = `@@ -${count(before, '-') + 1},${count(lines, '-')} +${count(before, '+') + 1},${count(lines, '+')} @@`
   return { source: [minus, plus, header, ...lines].join('\n'), from, to: from + lines.length, total: body.length }
+}
+
+const SIDE_INK: Record<string, string> = { frontend: INK.teal, backend: INK.purple, repo: INK.clay }
+
+/**
+ * One branch as GitHub Desktop would show it: main as a lane, the branch
+ * leaving it where it forked with a dot per commit (hollow = not pushed,
+ * filled bright = made in this session), main's commits since then, and
+ * staging below with the PR (dashed while open) or the branch already in it.
+ */
+export function drawGraph(b: Branch, pr: Pr | null | undefined, w: number, sessionStart: number): string {
+  const c = new Canvas(w, 2)
+  const ink = SIDE_INK[b.side] ?? INK.clay
+  const tag = b.side === 'frontend' ? 'FE' : b.side === 'backend' ? 'BE' : '⎇'
+  c.line([{ t: tag, pill: ink, size: 10.5 }, { t: b.branch ?? '(detached)', mono: true, bold: true, size: 12.5, grow: true }], pr ? [{ t: prLook(pr).text, pill: prLook(pr).color, size: 10.5 }] : [{ t: 'no PR', cls: 'm', size: 11 }], 24)
+
+  const text = (x: number, y: number, s: string, opts: { anchor?: string; cls?: string; color?: string; size?: number; mono?: boolean } = {}): string =>
+    `<text x="${x}" y="${y}" font-family="${opts.mono ? MONO : SANS}" font-size="${(opts.size ?? 11) * FONT}" ${opts.anchor ? `text-anchor="${opts.anchor}"` : ''} ${opts.color ? `fill="${opts.color}"` : `class="${opts.cls ?? 's'}"`}>${esc(s)}</text>`
+  const left = 64
+  const right = w - 16
+  const yMain = 14
+  const yBranch = 46
+  const yStaging = 78
+  const fork = left + 18
+  const parts: string[] = []
+  // main
+  parts.push(text(4, yMain + 4, b.base ?? 'main', { cls: 's' }), `<line x1="${left}" x2="${right}" y1="${yMain}" y2="${yMain}" stroke="${INK.gray}" stroke-opacity=".55" stroke-width="2"/>`, `<circle cx="${fork}" cy="${yMain}" r="3.5" fill="${INK.gray}"/>`)
+  const own = [...b.log].reverse()
+  const shown = own.slice(-10)
+  const span = Math.max(60, (right - fork - 60) * 0.62)
+  const step = shown.length > 1 ? span / (shown.length - 1) : 0
+  const x0 = fork + 34
+  const tipX = x0 + step * Math.max(0, shown.length - 1)
+  // main since the fork
+  if (b.behindBase) {
+    const n = Math.min(6, b.behindBase)
+    for (let i = 0; i < n; i++) parts.push(`<circle cx="${tipX - 10 - (n - 1 - i) * 12}" cy="${yMain}" r="2.6" fill="${INK.gray}" fill-opacity=".8"/>`)
+    parts.push(text(tipX + 2, yMain - 5, `+${b.behindBase} since`, { cls: 'm', size: 10 }))
+  }
+  // the branch
+  parts.push(text(4, yBranch + 4, tag === '⎇' ? 'branch' : tag, { color: ink }), `<path d="M${fork} ${yMain} C ${fork} ${yBranch}, ${fork} ${yBranch}, ${fork + 18} ${yBranch} L ${tipX} ${yBranch}" fill="none" stroke="${ink}" stroke-width="2"/>`)
+  if (own.length > shown.length) parts.push(text(fork + 20, yBranch - 6, `+${own.length - shown.length} earlier`, { cls: 'm', size: 9.5 }))
+  shown.forEach((k, i) => {
+    const x = x0 + step * i
+    const mine = k.at >= sessionStart
+    parts.push(k.isPushed ? `<circle cx="${x}" cy="${yBranch}" r="4.5" fill="${mine ? ink : 'none'}" stroke="${ink}" stroke-width="2"${mine ? '' : ' class="card"'}/>` : `<circle cx="${x}" cy="${yBranch}" r="4.5" class="card" stroke="${ink}" stroke-width="2" stroke-dasharray="2 2"/>`)
+  })
+  if (!shown.length) parts.push(text(fork + 24, yBranch + 4, 'no commits yet', { cls: 'm', size: 10.5 }))
+  const unpushed = b.log.filter(k => !k.isPushed).length
+  parts.push(text(tipX + 10, yBranch + 4, `${plural(b.commits, 'commit')}${unpushed ? ` · ${unpushed} not pushed` : ''}`, { color: unpushed ? INK.amber : undefined, cls: 's', size: 10.5 }))
+  // staging and the PR
+  let h = yBranch + 16
+  if (b.staging) {
+    const toStaging = pr?.base === 'staging' || b.staging.isIn
+    parts.push(text(4, yStaging + 4, 'staging', { cls: 's' }), `<line x1="${left}" x2="${right}" y1="${yStaging}" y2="${yStaging}" stroke="${INK.teal}" stroke-opacity=".55" stroke-width="2"/>`)
+    if (toStaging) {
+      const merged = b.staging.isIn || pr?.state === 'MERGED'
+      parts.push(`<path d="M${tipX} ${yBranch + 5} C ${tipX} ${yStaging}, ${tipX} ${yStaging}, ${tipX + 22} ${yStaging}" fill="none" stroke="${merged ? INK.teal : ink}" stroke-width="2"${merged ? '' : ' stroke-dasharray="4 3"'}/>`, `<circle cx="${tipX + 22}" cy="${yStaging}" r="3.5" fill="${merged ? INK.teal : 'none'}" stroke="${merged ? INK.teal : ink}" stroke-width="1.5"/>`)
+      parts.push(text(tipX + 32, yStaging + 4, merged ? 'in staging' : pr ? `PR #${pr.number} open` : '', { color: merged ? INK.teal : undefined, cls: 's', size: 10.5 }))
+    } else parts.push(text(tipX + 10, yStaging + 4, b.staging.ahead ? `${plural(b.staging.ahead, 'commit')} not in staging` : 'nothing new for staging', { cls: 'm', size: 10.5 }))
+    h = yStaging + 14
+  }
+  c.raw(parts.join(''), h)
+  return c.svg()
+}
+
+/** The branch's commits as a rail, newest on top, the ones from this session marked. */
+export function drawCommits(b: Branch, w: number, now: number, sessionStart: number): string {
+  const c = new Canvas(w, 2)
+  const ink = SIDE_INK[b.side] ?? INK.clay
+  const rows = b.log.slice(0, 12)
+  const top = c.height
+  rows.forEach((k, i) => {
+    const mine = k.at >= sessionStart
+    c.line(
+      [{ t: '', size: 11 }, { t: k.subject, size: 12, bold: mine, cls: mine ? 't' : 's', grow: true, gap: 22 }],
+      [...(mine ? [{ t: 'this session', pill: ink, size: 9.5 } as Seg] : []), ...(k.isPushed ? [] : [{ t: 'not pushed', pill: INK.amber, size: 9.5 } as Seg]), { t: k.author.split(' ')[0] ?? '', cls: 'm', size: 10.5 }, { t: k.sha, mono: true, cls: 'm', size: 10.5 }, { t: ago(k.at, now), cls: 'm', size: 10.5 }],
+      20,
+    )
+  })
+  // the rail: one line through the dots, drawn over the rows' left gutter
+  const rail = rows.map((k, i) => {
+    const y = top + i * 20 + 10
+    return k.isPushed ? `<circle cx="9" cy="${y}" r="3.6" fill="${ink}"/>` : `<circle cx="9" cy="${y}" r="3.6" class="card" stroke="${ink}" stroke-width="1.6"/>`
+  })
+  if (rows.length) c.overlay(`<line x1="9" x2="9" y1="${top + 10}" y2="${top + (rows.length - 1) * 20 + 10}" stroke="${ink}" stroke-opacity=".5" stroke-width="2"/>${rail.join('')}`)
+  if (b.log.length > rows.length) c.text(`+${b.log.length - rows.length} older`, { cls: 'm', size: 11, lines: 1, indent: 22 })
+  if (!rows.length) c.text('No commits on this branch yet.', { cls: 'm', size: 11.5, lines: 1 })
+  return c.svg()
+}
+
+/** One Overview row: a fixed label column, the summary, facts on the right; its tab opens from the button beside it. */
+export function drawRow(label: string, left: Seg[], right: Seg[], w: number): string {
+  const c = new Canvas(w, 2)
+  const first = left[0]
+  c.line([{ t: label.toUpperCase(), cls: 'm', size: 9.5, bold: true }, ...(first ? [{ ...first, gap: Math.max(8, 74 - width(label.toUpperCase(), 9.5 * FONT, { bold: true })) }, ...left.slice(1)] : [])], right, 24)
+  return c.svg()
+}
+
+/** Skills & plugins: what this session used, this project's skills, the plugins on, your global skills. */
+export function drawKit(k: Kit, w: number): string {
+  const c = new Canvas(w, 2)
+  const chips = (items: Seg[], h = 22): void => {
+    let row: Seg[] = []
+    let used = 0
+    for (const it of items) {
+      const size = width(it.t ?? '', (it.size ?? 11) * FONT) + 22
+      if (row.length && used + size > w - 20) {
+        c.line(row, [], h)
+        row = []
+        used = 0
+      }
+      row.push(it)
+      used += size
+    }
+    if (row.length) c.line(row, [], h)
+  }
+  c.label('Used in this session', k.used.length ? `${k.used.reduce((n, u) => n + u.count, 0)} runs` : '', INK.clay)
+  if (k.used.length) chips(k.used.map(u => ({ t: u.count > 1 ? `${u.name} ×${u.count}` : u.name, pill: INK.clay, size: 11 })))
+  else c.text('No skill or slash command used yet.', { cls: 'm', size: 11.5, lines: 1 })
+  c.space(8).label('This project', plural(k.projectSkills.length, 'skill'), INK.blue)
+  if (!k.projectSkills.length) c.text('This project has no skills of its own (.claude/skills).', { cls: 'm', size: 11.5, lines: 1 })
+  for (const sk of k.projectSkills) {
+    c.line([{ t: sk.name, bold: true, size: 12.5 }, { t: sk.description, cls: 's', size: 11.5, grow: true }], sk.where ? [{ t: sk.where, cls: 'm', size: 10.5 }] : [], 21)
+  }
+  c.space(8).label('Plugins on', `${k.plugins.filter(p => p.scope === 'project').length} for this project · ${k.plugins.filter(p => p.scope === 'user').length} everywhere`, INK.purple)
+  for (const p of k.plugins) {
+    c.line([{ t: p.name, bold: true, size: 12.5 }, ...(p.scope === 'project' ? [{ t: 'this project', pill: INK.purple, size: 10 } as Seg] : []), { t: p.commands.length ? p.commands.slice(0, 6).map(x => `/${x}`).join('  ') : '', cls: 'm', size: 11, mono: true, grow: true }], [{ t: p.commands.length ? plural(p.commands.length, 'command') : '', cls: 's', size: 10.5 }], 21)
+  }
+  c.space(8).label('Your global skills', plural(k.globalSkills.length, 'skill'), INK.gray)
+  if (k.globalSkills.length) chips(k.globalSkills.map(sk => ({ t: sk.name, pill: INK.gray, size: 10.5 })), 20)
+  else c.text('None in ~/.claude/skills.', { cls: 'm', size: 11.5, lines: 1 })
+  return c.svg()
 }
