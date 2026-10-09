@@ -119,10 +119,22 @@ export async function refreshFocus(io: Io): Promise<void> {
     await io.s.worktrees.set(() => [...new Set(names)].sort())
     return
   }
-  const top = await git(io, me.root, 'rev-parse', '--show-toplevel')
+  // The session's folder, else the repo of the file it touched last, else a repo just inside it.
+  let top = await git(io, me.root, 'rev-parse', '--show-toplevel')
+  if (!top.ok) {
+    const recent = (await io.s.touched.get())[0]?.path
+    if (recent) top = await git(io, recent.split('/').slice(0, -1).join('/'), 'rev-parse', '--show-toplevel')
+  }
+  if (!top.ok) {
+    for (const entry of await io.list(me.root).catch(() => [])) {
+      if (entry.kind !== 'dir' || entry.name.startsWith('.') || !(await io.exists(`${me.root}/${entry.name}/.git`))) continue
+      top = await git(io, `${me.root}/${entry.name}`, 'rev-parse', '--show-toplevel')
+      if (top.ok) break
+    }
+  }
   const branch = top.ok ? await branchOf(io, top.out, 'repo') : null
   const focus: Focus = {
-    project: basename(top.ok ? top.out : me.root),
+    project: basename(me.root),
     root: top.ok ? top.out : me.root,
     isIms: false,
     worktree: null,

@@ -57,6 +57,7 @@ export async function turnFinished(io: Io, e: TurnCompleteInput, toggles: Toggle
   const edits = (await io.s.edits.get()).filter(x => x.turnId === turn.id).length
   const didWork = turn.tools > 0 || e.durationMs > 20_000
   if (!didWork && e.answer.trim().length < MIN_ANSWER) return
+  if (!toggles.know && !toggles.next && !(toggles.replay && edits)) return
   const cost = (await io.usage())?.cost?.usd ?? null
   const wantKnow = toggles.know && didWork
   const wantNext = toggles.next && e.answer.trim().length >= MIN_ANSWER
@@ -72,6 +73,7 @@ export async function turnFinished(io: Io, e: TurnCompleteInput, toggles: Toggle
     edits,
     know: [],
     next: [],
+    dismissed: [],
   }
   await io.s.after.set(() => card)
   if (!wantKnow && !wantNext) return
@@ -92,6 +94,6 @@ export async function turnFinished(io: Io, e: TurnCompleteInput, toggles: Toggle
 }
 
 export async function takeNext(io: Io, s: Suggestion): Promise<void> {
-  await io.s.after.set(a => (a ? { ...a, state: 'hidden' } : a))
+  await io.s.after.set(a => (a ? { ...a, dismissed: [...a.dismissed, 'next' as const] } : a))
   if (!(await io.fill(s.prompt))) io.toast('Could not put that in the prompt box')
 }

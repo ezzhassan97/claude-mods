@@ -4,7 +4,8 @@
 import { writeFileSync } from 'node:fs'
 
 import type { After, Agent, Beat, Edit, Env, Focus, Github, Held, Pr, Rule, Ticket, Touch, Usage } from '../command-center/types'
-import { drawAfter, drawAgents, drawBar, drawDeploys, drawFiles, drawHeld, drawJira, drawOverview, drawPr, drawPrList, drawRule, drawTimeline } from '../command-center/hooks/views/draw'
+import { drawAgents, drawBar, drawDeploys, drawFiles, drawHeld, drawJira, drawKnow, drawNext, drawOverview, drawPr, drawPrList, drawReplay, drawRule, drawTimeline, drawToggle } from '../command-center/hooks/views/draw'
+import { CONTROLS } from '../command-center/hooks/features/controls'
 
 const now = Date.parse('2026-10-09T18:00:00Z')
 const min = 60_000
@@ -68,7 +69,7 @@ const others: Beat[] = [
   { id: 's2', project: 'ims-nawy', branch: 'IMS-2425-Developers-Whatsapp-Chats', ticket: 'IMS-2425', title: 'Developers WhatsApp chats', status: 'waiting', waitingFor: 'Approve: git push origin IMS-2425…', contextPct: 61, costUsd: 3.1, agents: 0, updatedAt: now },
   { id: 's3', project: 'septem', branch: 'dev', ticket: null, title: 'Order product brief', status: 'idle', waitingFor: null, contextPct: 12, costUsd: 0.4, agents: 0, updatedAt: now - 14 * min },
 ]
-const after: After = { turnId: 't', state: 'ready', durationMs: 42_000, tools: 12, files: ['a', 'b', 'c', 'd'], added: 120, removed: 30, costUsd: 0.31, edits: 4, know: ['The pin-drop link now writes to the shared staging DB — the 3 test amenities you dropped are real rows.', 'amenity.mapper.ts is used by 14 files in 4 modules; the PR note should say so.'], next: [] }
+const after: After = { turnId: 't', state: 'ready', durationMs: 42_000, tools: 12, files: ['a', 'b', 'c', 'd'], added: 120, removed: 30, costUsd: 0.31, edits: 4, know: ['The pin-drop link now writes to the shared staging DB — the 3 test amenities you dropped are real rows.', 'amenity.mapper.ts is used by 14 files in 4 modules; the PR note should say so.'], next: [{ label: 'Run the amenities tests', prompt: 'Run the amenities tests in the frontend worktree' }, { label: 'Open the PRs', prompt: '/ims-end masterplan-amenities' }, { label: 'Fix the overlapping counter bug', prompt: 'Fix IMS-2430: overlapping names hide the counter' }], dismissed: [] }
 const rule: Rule = { id: 1, rule: 'Use pnpm instead of npm for package management in this project.', quote: 'no - in this repo we always use pnpm, not npm', confidence: 0.95 }
 const held: Held = { command: 'rm -rf build', title: 'Recursive delete', summary: 'deletes 9 files · 286 KB — none tracked by git, so they cannot be restored', note: 'in demo-app', decision: null, lines: [{ name: 'build/assets/vendor.81d3aa.js', detail: '79 KB' }, { name: 'build/assets/app.4f9c2e.js', detail: '63 KB' }, { name: 'build/assets/vendor.81d3aa.js.map', detail: '35 KB' }, { name: 'build/assets/styles.c07b1d.css', detail: '29 KB' }] }
 const edits: Edit[] = [
@@ -86,7 +87,9 @@ const blocks: [string, string][] = [
   ['Bar · IMS session (working)', drawBar(bar, W)],
   ['Bar · narrow', drawBar(bar, 520)],
   ['Bar · any other repo', drawBar(generic, W)],
-  ['Card · after a turn', drawAfter(after, W, true)],
+  ['Card · you should know', drawKnow(after.know, W, false)],
+  ['Card · replay', drawReplay(after, ['/x/src/AmenityMap.tsx', '/x/src/usePinCluster.ts', '/x/src/amenity.mapper.ts'], W)],
+  ['Card · what\'s next', drawNext(after.next, W)],
   ['Card · reflect', drawRule(rule, W, './CLAUDE.md')],
   ['Card · guard', drawHeld(held, W)],
   ['Panel · overview', drawOverview({ ...bar, agents, startedAt: now - 47 * min, now, others }, P)],
@@ -98,6 +101,7 @@ const blocks: [string, string][] = [
   ['Panel · Jira', drawJira(ticket, P, now)],
   ['Panel · Vercel', drawDeploys(github.deploys, P, now)],
   ['Replay · timeline', drawTimeline(edits, 0, P, '/x')],
+  ...CONTROLS.map((c, i) => [`Controls · ${c.key}`, drawToggle(c.name, c.what, i % 3 !== 1, P)] as [string, string]),
 ]
 
 const html = `<!doctype html><meta charset="utf-8"><title>Command center preview</title>

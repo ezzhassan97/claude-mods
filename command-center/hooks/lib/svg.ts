@@ -21,8 +21,8 @@ const SANS = "ui-sans-serif, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans
 const MONO = "ui-monospace, SFMono-Regular, Menlo, monospace"
 
 const STYLE =
-  '.t{fill:#1f1e1d}.s{fill:#6f6d66}.m{fill:#a3a19a}.k{fill:#e9e7df}.tile{fill:#f3f1ea}.ln{stroke:#e4e2da}' +
-  '@media (prefers-color-scheme: dark){.t{fill:#ecebe6}.s{fill:#a8a69f}.m{fill:#76746e}.k{fill:#34332f}.tile{fill:#262523}.ln{stroke:#33322e}}' +
+  '.t{fill:#1f1e1d}.s{fill:#6f6d66}.m{fill:#a3a19a}.k{fill:#e9e7df}.tile{fill:#f3f1ea}.ln{stroke:#e4e2da}.card{fill:#fbfaf6;stroke:#e2e0d7}.bar{fill:#f1efe8;stroke:#dedcd2}' +
+  '@media (prefers-color-scheme: dark){.t{fill:#ecebe6}.s{fill:#a8a69f}.m{fill:#76746e}.k{fill:#34332f}.tile{fill:#262523}.ln{stroke:#33322e}.card{fill:#232220;stroke:#383733}.bar{fill:#1b1a19;stroke:#3a3935}}' +
   '.live{animation:pulse 1.4s ease-in-out infinite}@keyframes pulse{50%{opacity:.35}}' +
   '@media (prefers-reduced-motion: reduce){.live{animation:none}}'
 
@@ -100,10 +100,27 @@ function drawSeg(s: Seg, x: number, y: number, text: string): string {
 }
 
 /** A vertical stack of drawn lines, sized to `w` px; `svg()` closes it. */
+export type Icon = 'play' | 'bulb' | 'next' | 'bookmark' | 'shield' | 'trash'
+
+const ICON: Record<Icon, string> = {
+  play: '<path d="M9 7.5v9l7.5-4.5z" fill="currentColor" stroke="none"/>',
+  bulb: '<path d="M9 18h6"/><path d="M10 21h4"/><path d="M12 3a6 6 0 0 0-3.5 10.9c.5.4.9 1 1 1.6V16h5v-.5c.1-.6.5-1.2 1-1.6A6 6 0 0 0 12 3z"/>',
+  next: '<path d="M5 12h12"/><path d="M13 7l5 5-5 5"/>',
+  bookmark: '<path d="M7 4h10v16l-5-3.5L7 20z"/><path d="M12 8v5"/><path d="M9.5 10.5h5"/>',
+  shield: '<path d="M12 3l7 3v5c0 4.5-3 8.3-7 10-4-1.7-7-5.5-7-10V6z"/><path d="M12 8v5"/><path d="M12 16h.01"/>',
+  trash: '<path d="M4 7h16"/><path d="M10 11v6"/><path d="M14 11v6"/><path d="M6 7l1 13h10l1-13"/><path d="M9 7V4h6v3"/>',
+}
+
+/** A card: framed background, an icon badge on the left, content beside it. */
+export type Frame = { icon: Icon; ink: string } | { bar: true }
+
 export class Canvas {
   private parts: string[] = []
   y = 0
-  constructor(readonly w: number, readonly pad = 0) {}
+  readonly pad: number
+  constructor(readonly w: number, pad = 0, private readonly frame?: Frame) {
+    this.pad = frame && 'icon' in frame ? 54 : pad
+  }
 
   space(h: number): this {
     this.y += h
@@ -115,7 +132,7 @@ export class Canvas {
     const base = this.y + h * 0.7
     const gapOf = (s: Seg): number => s.gap ?? 7
     const rightW = right.reduce((n, s, i) => n + segWidth(s) + (i ? gapOf(s) : 0), 0)
-    let room = this.w - this.pad * 2 - (right.length ? rightW + 14 : 0)
+    let room = this.w - this.pad - this.rpad - (right.length ? rightW + 14 : 0)
     const fixed = left.filter(s => !s.grow).reduce((n, s, i) => n + segWidth(s) + (i ? gapOf(s) : 0), 0)
     const growers = left.filter(s => s.grow)
     const each = growers.length ? Math.max(0, (room - fixed - growers.length * 7) / growers.length) : 0
@@ -131,7 +148,7 @@ export class Canvas {
       x += segWidth(shown)
     }
     room = 0
-    let rx = this.w - this.pad - rightW
+    let rx = this.w - this.rpad - rightW
     for (const [i, s] of right.entries()) {
       if (i) rx += gapOf(s)
       this.parts.push(drawSeg(s, rx, base, s.t ?? ''))
@@ -145,7 +162,7 @@ export class Canvas {
   label(text: string, aside = '', color?: string): this {
     const base = this.y + 13
     this.parts.push(`<text x="${this.pad}" y="${base}" font-family="${SANS}" font-size="10.5" font-weight="600" letter-spacing=".7" ${color ? `fill="${color}"` : 'class="s"'}>${esc(text.toUpperCase())}</text>`)
-    if (aside) this.parts.push(`<text x="${this.w - this.pad}" y="${base}" text-anchor="end" font-family="${SANS}" font-size="11" class="m">${esc(aside)}</text>`)
+    if (aside) this.parts.push(`<text x="${this.w - this.rpad}" y="${base}" text-anchor="end" font-family="${SANS}" font-size="11" class="m">${esc(aside)}</text>`)
     this.y += 20
     return this
   }
@@ -153,7 +170,7 @@ export class Canvas {
   /** Stat tiles in a row: muted label over a large value. */
   tiles(items: { label: string; value: string; color?: string }[]): this {
     const gap = 8
-    const tw = (this.w - this.pad * 2 - gap * (items.length - 1)) / items.length
+    const tw = (this.w - this.pad - this.rpad - gap * (items.length - 1)) / items.length
     items.forEach((it, i) => {
       const x = this.pad + i * (tw + gap)
       this.parts.push(
@@ -168,7 +185,7 @@ export class Canvas {
 
   /** A full-width progress bar with an optional label above it. */
   progress(pct: number, color: string, h = 6): this {
-    const w = this.w - this.pad * 2
+    const w = this.w - this.pad - this.rpad
     const fill = Math.max(0, Math.min(1, pct)) * w
     this.parts.push(`<rect class="k" x="${this.pad}" y="${this.y}" width="${w}" height="${h}" rx="${h / 2}"/>`)
     if (fill > 0) this.parts.push(`<rect x="${this.pad}" y="${this.y}" width="${Math.max(h, fill)}" height="${h}" rx="${h / 2}" fill="${color}"/>`)
@@ -177,16 +194,16 @@ export class Canvas {
   }
 
   rule(): this {
-    this.parts.push(`<line class="ln" x1="${this.pad}" x2="${this.w - this.pad}" y1="${this.y + 6}" y2="${this.y + 6}" stroke-width="1"/>`)
+    this.parts.push(`<line class="ln" x1="${this.pad}" x2="${this.w - this.rpad}" y1="${this.y + 6}" y2="${this.y + 6}" stroke-width="1"/>`)
     this.y += 12
     return this
   }
 
   /** Wrapped text, up to `lines` lines, with an optional colored bullet. */
-  text(body: string, opts: { cls?: 't' | 's' | 'm'; color?: string; size?: number; lines?: number; bullet?: string; indent?: number } = {}): this {
+  text(body: string, opts: { cls?: 't' | 's' | 'm'; color?: string; size?: number; lines?: number; bullet?: string; indent?: number; reserve?: number } = {}): this {
     const size = opts.size ?? 12.5
     const indent = (opts.indent ?? 0) + (opts.bullet ? 14 : 0)
-    const max = this.w - this.pad * 2 - indent
+    const max = this.w - this.pad - this.rpad - indent - (opts.reserve ?? 0)
     const words = body.split(/\s+/).filter(Boolean)
     const out: string[] = []
     let cur = ''
@@ -217,9 +234,24 @@ export class Canvas {
     return this
   }
 
+  /** Right padding: framed cards keep 14px, bare drawings their own pad. */
+  get rpad(): number {
+    return this.frame ? 14 : this.pad
+  }
+
   svg(): string {
     const h = Math.ceil(this.y)
-    return `<svg xmlns="http://www.w3.org/2000/svg" width="${this.w}" height="${h}" viewBox="0 0 ${this.w} ${h}"><style>${STYLE}</style>${this.parts.join('')}</svg>`
+    let back = ''
+    if (this.frame && 'icon' in this.frame) {
+      const { icon, ink } = this.frame
+      back =
+        `<rect class="card" x=".5" y=".5" width="${this.w - 1}" height="${h - 1}" rx="12" stroke-width="1"/>` +
+        `<circle cx="27" cy="28" r="15" fill="${ink}" fill-opacity=".15"/>` +
+        `<g transform="translate(16.5 17.5) scale(.875)" fill="none" stroke="${ink}" color="${ink}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">${ICON[icon]}</g>`
+    } else if (this.frame) {
+      back = `<rect class="bar" x=".5" y=".5" width="${this.w - 1}" height="${h - 1}" rx="10" stroke-width="1"/>`
+    }
+    return `<svg xmlns="http://www.w3.org/2000/svg" width="${this.w}" height="${h}" viewBox="0 0 ${this.w} ${h}"><style>${STYLE}</style>${back}${this.parts.join('')}</svg>`
   }
 
   get height(): number {

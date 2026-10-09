@@ -52,7 +52,7 @@ export type BarInput = {
 
 /** The bar above the prompt: who this session is (line 1) and each branch (one line each). */
 export function drawBar(d: BarInput, w: number): string {
-  const c = new Canvas(w, 4)
+  const c = new Canvas(w, 12, { bar: true }).space(3)
   const working = d.status === 'working'
   const waiting = d.status === 'waiting'
   const head: Seg = { dot: waiting ? INK.amber : working ? INK.clay : d.ticket ? statusInk(d.ticket.status, d.ticket.category) : INK.gray, live: working || waiting }
@@ -86,46 +86,75 @@ export function drawBar(d: BarInput, w: number): string {
     segs.push(look ? { t: look.text, pill: look.color, size: 11 } : { t: 'no PR', cls: 'm', size: 11.5 })
     c.line(segs, i === 0 ? usageSegs(d.usage) : [], 21)
   })
+  c.space(4)
   return c.svg()
 }
 
-/** After a finished turn: the receipt and what you should know. */
-export function drawAfter(a: After, w: number, showKnow: boolean): string {
-  const c = new Canvas(w, 12).space(6)
-  const stats = [dur(a.durationMs), a.tools ? plural(a.tools, 'tool') : '', a.files.length ? `${plural(a.files.length, 'file')} +${a.added} −${a.removed}` : '', a.costUsd != null ? money(a.costUsd) : ''].filter(Boolean).join(' · ')
-  c.label('Done', stats, INK.green)
-  if (showKnow) {
-    if (a.state === 'loading') c.text('Looking for anything you should know…', { cls: 'm', size: 12.5, lines: 1 })
-    else if (a.know.length) {
-      c.label('You should know', '', INK.amber)
-      for (const k of a.know.slice(0, 3)) c.text(k, { size: 13, lines: 2, bullet: INK.amber })
-    }
-  }
-  c.space(4)
+/** You should know: what a finished task left that you could easily miss. */
+export function drawKnow(know: string[], w: number, isLoading: boolean): string {
+  const c = new Canvas(w, 0, { icon: 'bulb', ink: INK.amber }).space(12)
+  c.label('You should know', isLoading ? 'checking the task you just finished…' : 'about the task you just finished', INK.amber)
+  if (isLoading) c.text('Looking for risks, side effects and decisions left to you…', { cls: 'm', size: 12.5, lines: 1 })
+  for (const k of know.slice(0, 3)) c.text(k, { size: 13.5, lines: 3, bullet: INK.amber })
+  c.space(8)
+  return c.svg()
+}
+
+/** What's next: the likely next prompts, numbered for the buttons under them. */
+export function drawNext(next: { label: string; prompt: string }[], w: number): string {
+  const c = new Canvas(w, 0, { icon: 'next', ink: INK.blue }).space(12)
+  c.label("What's next", 'press 1–3 to put one in the prompt box', INK.blue)
+  next.slice(0, 3).forEach((n, i) => c.line([{ t: String(i + 1), color: INK.blue, bold: true, size: 12.5 }, { t: n.label, bold: true, size: 13 }, { t: n.prompt === n.label ? '' : n.prompt, cls: 'm', size: 12, grow: true }], [], 22))
+  c.space(6)
+  return c.svg()
+}
+
+/** Replay: the edits of the task you just finished, ready to step through. */
+export function drawReplay(a: After, files: string[], w: number): string {
+  const c = new Canvas(w, 0, { icon: 'play', ink: INK.clay }).space(12)
+  const stats = [dur(a.durationMs), a.tools ? plural(a.tools, 'tool') : '', a.costUsd != null ? money(a.costUsd) : ''].filter(Boolean).join(' · ')
+  c.label('Replay', stats, INK.clay)
+  c.line([{ t: `${plural(a.edits, 'edit')} ready to replay`, bold: true, size: 14 }, { t: `+${a.added} −${a.removed}`, cls: 's', size: 12.5 }], [], 24)
+  c.text(files.map(f => basename(f)).join(' · '), { cls: 's', size: 12, lines: 1 })
+  c.space(6)
   return c.svg()
 }
 
 /** A correction you made, offered as a rule. */
 export function drawRule(r: Rule, w: number, target: string): string {
-  const c = new Canvas(w, 12).space(6)
+  const c = new Canvas(w, 0, { icon: 'bookmark', ink: INK.green }).space(12)
   c.label('Save this as a rule?', `${Math.round(r.confidence * 100)}% sure`, INK.green)
-  c.text(`“${r.rule}”`, { size: 14, lines: 3 })
+  c.text(`“${r.rule}”`, { size: 14.5, lines: 3 })
   c.text(`From what you said: “${r.quote}”`, { cls: 's', size: 12, lines: 2 })
   c.text(`Goes to ${target}`, { cls: 'm', size: 11.5, lines: 1 })
-  c.space(2)
+  c.space(6)
   return c.svg()
 }
 
 /** A risky command held until you answer. */
 export function drawHeld(h: Held, w: number): string {
-  const c = new Canvas(w, 12).space(6)
-  c.label('Held by the guard', 'waiting for you', INK.red)
+  const c = new Canvas(w, 0, { icon: h.title === 'Recursive delete' ? 'trash' : 'shield', ink: INK.red }).space(12)
+  c.label(`Held · ${h.title}`, 'waiting for you', INK.red)
   c.line([{ t: h.command, mono: true, size: 13, bold: true, grow: true }], [], 22)
-  c.text(h.summary, { color: INK.red, size: 13.5, lines: 2 })
+  c.text(h.summary, { color: INK.red, size: 14, lines: 2 })
   if (h.note) c.text(h.note, { cls: 's', size: 12, lines: 2 })
   for (const l of h.lines.slice(0, 6)) c.line([{ t: l.name, mono: true, size: 12, cls: 't', grow: true }], [{ t: l.detail, cls: 's', size: 11.5 }], 19)
   if (h.lines.length > 6) c.text(`+${h.lines.length - 6} more`, { cls: 'm', size: 11.5, lines: 1 })
-  c.space(4)
+  c.space(6)
+  return c.svg()
+}
+
+/** One switch of the Controls section: its name, what it does, and its state. */
+export function drawToggle(name: string, what: string, isOn: boolean, w: number): string {
+  const c = new Canvas(w, 2)
+  const sw = isOn ? INK.green : INK.gray
+  c.raw(
+    `<rect x="${w - 40}" y="6" width="34" height="20" rx="10" fill="${sw}" fill-opacity="${isOn ? 1 : 0.35}"/>` +
+      `<circle cx="${isOn ? w - 16 : w - 30}" cy="16" r="7.5" fill="#fff"/>`,
+    0,
+  )
+  c.line([{ t: name, bold: true, size: 13 }, { t: isOn ? 'on' : 'off', pill: isOn ? INK.green : INK.gray, size: 10.5 }], [{ t: '', size: 10, gap: 0 }, { t: '', size: 10, gap: 36 }], 22)
+  c.text(what, { cls: 's', size: 12, lines: 2, reserve: 52 })
   return c.svg()
 }
 

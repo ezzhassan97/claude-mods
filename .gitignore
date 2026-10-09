@@ -6,3 +6,4 @@ tsconfig.tsbuildinfo
 .types/
 dev/preview.html
 dev/node_modules/
+.impeccable/

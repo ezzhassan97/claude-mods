@@ -6,6 +6,7 @@ import type { EngineInterface, Register } from 'claude-code'
 
 import type { Github, Requirement, Toggles } from '../types'
 import { turnFinished } from './features/after'
+import { readBuiltinKnow } from './features/controls'
 import { guardCommand } from './features/guard'
 import { impactAfterTool } from './features/impact'
 import { checklistText, REQUIREMENTS_TOOL, refreshTicket, requirementsTool, ticketContext } from './features/jira'
@@ -25,7 +26,7 @@ import { panelView } from './views/panel'
 // only file that touches `$` (the engine follows `$` within one file and
 // reads state atoms where they are declared), so it builds `io` for the rest.
 
-const DEFAULT_TOGGLES: Toggles = { next: true, know: true, replay: true, reflect: true, guard: true, receipt: true }
+const DEFAULT_TOGGLES: Toggles = { next: true, know: true, builtinKnow: true, replay: true, reflect: true, guard: true }
 const EMPTY_GITHUB: Github = { focus: [], mine: [], deploys: [], at: 0, isLoading: false, error: null }
 const BUDGET_USD = 10
 
@@ -165,10 +166,12 @@ export const register: Register = on => {
     const io = makeIo($)
     for (const command of COMMANDS) await $.command.register(command).catch(error => $.ui.log(`command-center: /${command.name} not registered: ${String(error)}`, { to: 'debug' }))
     const toggles = (await $.store.get('toggles')) as Partial<Toggles> | undefined
-    await update($, togglesA, () => ({ ...DEFAULT_TOGGLES, ...(toggles ?? {}) }))
+    await update($, togglesA, () => ({ ...DEFAULT_TOGGLES, ...(toggles ?? {}), builtinKnow: false }))
     const mine = await $.store.get('mine')
     if (Array.isArray(mine)) await update($, githubA, g => ({ ...g, mine: mine as Github['mine'] }))
     await sessionStart(io)
+    const builtinKnow = await readBuiltinKnow(io)
+    await update($, togglesA, t => ({ ...t, builtinKnow }))
     ws.imsRoot = await findImsRoot(io, e.cwd)
     if (ws.imsRoot) await $.tool.register(REQUIREMENTS_TOOL).catch(() => undefined)
     void learnFromHistory(io).then(() => refreshAll(io)).then(() => refreshMine(io))
@@ -223,7 +226,7 @@ export const register: Register = on => {
     const io = makeIo($)
     await turnEnded(io)
     const toggles = await read($, togglesA)
-    if (toggles.receipt) await turnFinished(io, e, toggles)
+    await turnFinished(io, e, toggles)
     void refreshAll(io)
     return result
   })

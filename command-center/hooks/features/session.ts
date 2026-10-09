@@ -38,8 +38,9 @@ export async function sessionStart(io: Io): Promise<void> {
   me.dir = `${me.home}/.claude/command-center/sessions`
   me.startedAt = (await io.usage())?.startedAt ?? (await io.now())
   const history = await io.messages().catch(() => [])
-  const first = history.find(m => m.role === 'user' && m.text.trim() && !m.text.startsWith('/') && !m.text.startsWith('<'))
-  if (first) me.title = clean(first.text, 80)
+  const asked = history.filter(m => m.role === 'user' && m.text.trim() && !m.text.startsWith('/') && !m.text.startsWith('<'))
+  if (asked[0]) me.title = clean(asked[0].text, 80)
+  if (asked.length) me.lastPrompt = clean(asked[asked.length - 1]!.text, 160)
   await io.run(['mkdir', '-p', me.dir])
   await refreshUsage(io)
   await beat(io)

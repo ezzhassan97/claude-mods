@@ -146,13 +146,16 @@ export type After = {
   edits: number
   know: string[]
   next: Suggestion[]
+  /** Cards of this turn the person closed. */
+  dismissed: ('know' | 'next' | 'replay')[]
 }
 
 export type Rule = { id: number; rule: string; quote: string; confidence: number }
 
 export type Held = { command: string; title: string; summary: string; lines: { name: string; detail: string }[]; note: string | null; decision: 'run' | 'cancel' | null }
 
-export type Toggles = { next: boolean; know: boolean; replay: boolean; reflect: boolean; guard: boolean; receipt: boolean }
+/** `builtinKnow` is Anthropic's built-in mod (cc-plugin-you-should-know), the rest are this mod's. */
+export type Toggles = { next: boolean; know: boolean; builtinKnow: boolean; replay: boolean; reflect: boolean; guard: boolean }
 
 export type Panel = { collapsed: string[]; replay: number | null; showAllPrs: boolean; isPicking: boolean }
 

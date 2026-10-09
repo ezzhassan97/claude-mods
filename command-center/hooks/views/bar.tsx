@@ -9,11 +9,12 @@ import { dropRule, saveRule } from '../features/reflect'
 import { me } from '../features/session'
 import { dur, money, plural, trunc } from '../lib/fmt'
 import type { Io } from '../lib/io'
-import { drawAfter, drawBar, drawHeld, drawRule, prFor, prLook } from './draw'
+import { drawBar, drawHeld, drawKnow, drawNext, drawReplay, drawRule, prFor, prLook } from './draw'
 
-// The band above the prompt. From the top: whatever other plugins draw there,
-// a held command (guard), a rule to save (reflect), the card after a finished
-// turn (receipt, what you should know, replay, next actions), and the bar:
+// The band above the prompt. From the top: whatever other plugins draw there
+// (Anthropic's built-in "You should know" notes), a held command (guard), a
+// rule to save (reflect), then the cards of the task just finished, each its
+// own (you should know, replay, what's next), and last the fixed bar:
 // this session's ticket, branches, environment, PRs, progress and usage, with
 // the one button that opens the side panel. Desktop draws pictures; the
 // terminal draws the same facts as text.
@@ -60,32 +61,52 @@ export async function bandView(io: Io, E: Table, surface: RenderSurface, props: 
     )
   }
 
+  // The cards of the task just finished, each on its own: you should know, replay, what's next.
   if (after && after.state !== 'hidden' && !props.isWorking) {
+    const close = (card: 'know' | 'next' | 'replay') => (): void => void io.s.after.set(a => (a ? { ...a, dismissed: [...a.dismissed, card] } : a))
+    const isLoading = after.state === 'loading'
+    if (toggles.know && !after.dismissed.includes('know') && (isLoading || after.know.length)) {
+      parts.push(
+        <Box key={`know-${after.turnId}`} flexDirection="column" marginBottom={1}>
+          {Svg ? <Svg source={drawKnow(after.know, w, isLoading)} alt={`You should know: ${after.know.join(' ')}`} /> : <Box flexDirection="column">{after.know.map((k, i) => <Text key={`k-${i}`} color="warning" wrap="wrap">{`💡 ${k}`}</Text>)}</Box>}
+          {isLoading ? null : (
+            <Box columnGap={1}>
+              <Button key="know-more" label="Tell me more" onPress={() => {
+                  close('know')()
+                  void io.fill(`Tell me more about what I should know from that task: ${after.know.join(' ')}`)
+                }} />
+              <Button key="know-ok" plain dimColor label="Got it" onPress={close('know')} />
+            </Box>
+          )}
+        </Box>,
+      )
+    }
     const turnEdits = edits.filter(e => e.turnId === after.turnId)
-    const showKnow = toggles.know && (after.state === 'loading' || after.know.length > 0)
-    const next = toggles.next ? after.next : []
-    const firstEdit = edits.indexOf(turnEdits[0]!)
-    parts.push(
-      <Box key={`after-${after.turnId}`} flexDirection="column" marginBottom={1}>
-        {Svg ? (
-          <Svg source={drawAfter(after, w, showKnow)} alt={`Done in ${dur(after.durationMs)}. ${after.know.join(' ')}`} />
-        ) : (
-          <Box flexDirection="column">
-            <Text color="success">{`✻ Done · ${dur(after.durationMs)} · ${plural(after.tools, 'tool')}${after.files.length ? ` · ${plural(after.files.length, 'file')} +${after.added} −${after.removed}` : ''}${after.costUsd != null ? ` · ${money(after.costUsd)}` : ''}`}</Text>
-            {showKnow ? after.know.map((k, i) => <Text key={`know-${i}`} color="warning" wrap="wrap">{`• ${k}`}</Text>) : null}
+    if (toggles.replay && turnEdits.length && !after.dismissed.includes('replay')) {
+      const first = edits.indexOf(turnEdits[0]!)
+      parts.push(
+        <Box key={`replay-${after.turnId}`} flexDirection="column" marginBottom={1}>
+          {Svg ? <Svg source={drawReplay({ ...after, edits: turnEdits.length }, [...new Set(turnEdits.map(e => e.path))], w)} alt={`${turnEdits.length} edits ready to replay`} /> : <Text color="claude">{`▶ ${plural(turnEdits.length, 'edit')} ready to replay · ${dur(after.durationMs)}`}</Text>}
+          <Box columnGap={1}>
+            <Button key="replay-go" variant="primary" label="Replay edits" onPress={() => void io.s.panel.set(p => ({ ...p, replay: Math.max(0, first) })).then(() => io.togglePane(true))} />
+            <Button key="replay-close" plain dimColor label="Dismiss" onPress={close('replay')} />
           </Box>
-        )}
-        <Box columnGap={1} flexWrap="wrap">
-          {toggles.replay && turnEdits.length ? (
-            <Button key="after-replay" label={`▶ Replay ${plural(turnEdits.length, 'edit')}`} onPress={() => void io.s.panel.set(p => ({ ...p, replay: Math.max(0, firstEdit) })).then(() => io.togglePane(true))} />
-          ) : null}
-          {next.map((s, i) => (
-            <Button key={`next-${i}`} hotkey={String(i + 1)} label={s.label} onPress={() => void takeNext(io, s)} />
-          ))}
-          <Button key="after-dismiss" role="dismiss" plain dimColor label="Dismiss" onPress={() => void io.s.after.set(a => (a ? { ...a, state: 'hidden' } : a))} />
-        </Box>
-      </Box>,
-    )
+        </Box>,
+      )
+    }
+    if (toggles.next && after.next.length && !after.dismissed.includes('next')) {
+      parts.push(
+        <Box key={`next-${after.turnId}`} flexDirection="column" marginBottom={1}>
+          {Svg ? <Svg source={drawNext(after.next, w)} alt={`What's next: ${after.next.map(n => n.label).join(', ')}`} /> : <Text color="suggestion">What's next</Text>}
+          <Box columnGap={1} flexWrap="wrap">
+            {after.next.map((n, i) => (
+              <Button key={`next-${i}`} hotkey={String(i + 1)} label={n.label} onPress={() => void takeNext(io, n)} />
+            ))}
+            <Button key="next-close" plain dimColor label="Dismiss" onPress={close('next')} />
+          </Box>
+        </Box>,
+      )
+    }
   }
 
   const done = ticket?.requirements.filter(r => r.state !== 'open').length ?? 0

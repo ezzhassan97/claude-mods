@@ -3,14 +3,14 @@
 /* @jsxFrag Fragment */
 import type { Elements, RenderElement, RenderSurface } from 'claude-code'
 
-import type { Toggles } from '../../types'
+import { CONTROLS, flip } from '../features/controls'
 import { checkConflicts, markSeen, refreshFocusPrs, refreshMine } from '../features/prs'
 import { refreshAll } from '../features/refresh'
 import { me } from '../features/session'
 import { fixTunnels, pickWorktree, ws } from '../features/workspace'
 import { basename, money, plural, trunc } from '../lib/fmt'
 import type { Io } from '../lib/io'
-import { drawAgents, drawDeploys, drawFiles, drawJira, drawOverview, drawPr, drawPrList, drawTimeline, prLook, unified } from './draw'
+import { drawAgents, drawDeploys, drawFiles, drawJira, drawOverview, drawPr, drawPrList, drawTimeline, drawToggle, prLook, unified } from './draw'
 
 // The side panel: one panel, sections stacked (Overview, Agents, Files,
 // GitHub, Jira, Vercel when the branch deploys there, Controls), each
@@ -19,22 +19,6 @@ import { drawAgents, drawDeploys, drawFiles, drawJira, drawOverview, drawPr, dra
 type Table = Elements[RenderSurface]
 
 export const PANEL = 'command-center'
-
-const TOGGLES: { key: keyof Toggles; label: string }[] = [
-  { key: 'next', label: 'Next actions' },
-  { key: 'know', label: 'What you should know' },
-  { key: 'replay', label: 'Replay' },
-  { key: 'reflect', label: 'Reflect' },
-  { key: 'guard', label: 'Guard risky commands' },
-  { key: 'receipt', label: 'Card after each task' },
-]
-
-async function flip(io: Io, key: keyof Toggles): Promise<void> {
-  const t = await io.s.toggles.get()
-  const next = { ...t, [key]: !t[key] }
-  await io.s.toggles.set(() => next)
-  await io.storeSet('toggles', next)
-}
 
 export async function panelView(io: Io, E: Table, surface: RenderSurface, cols: number): Promise<RenderElement> {
   const { Box, Text, Button, Link, Code } = E
@@ -180,17 +164,28 @@ export async function panelView(io: Io, E: Table, surface: RenderSurface, cols: 
     }
   }
 
-  // Controls
-  sections.push(header('controls', 'Controls'))
+  // Controls: one row per switch, what it does in plain words, and one button.
+  sections.push(header('controls', 'Controls', `${CONTROLS.filter(c => toggles[c.key]).length} of ${CONTROLS.length} on`))
   if (isOpen('controls')) {
-    sections.push(
-      <Box key="controls" flexWrap="wrap" columnGap={1} rowGap={0}>
-        {TOGGLES.map(t => (
-          <Button key={`tg-${t.key}`} variant={toggles[t.key] ? 'primary' : undefined} label={`${toggles[t.key] ? '●' : '○'} ${t.label}`} onPress={() => void flip(io, t.key)} />
-        ))}
-      </Box>,
-    )
-    if (ws.imsRoot) sections.push(<Text key="ims-on" dimColor>IMS rules are on in ims-nawy: PRs into staging, Mazen reviews, no merges, nawy token, schema changes ask first.</Text>)
+    for (const c of CONTROLS) {
+      const isOn = toggles[c.key]
+      sections.push(
+        <Box key={`ctl-${c.key}`} flexDirection="column" marginTop={1}>
+          {Svg ? (
+            <Svg source={drawToggle(c.name, c.what, isOn, w)} alt={`${c.name}: ${isOn ? 'on' : 'off'}. ${c.what}`} />
+          ) : (
+            <Box flexDirection="column">
+              <Text bold>{`${isOn ? '●' : '○'} ${c.name}`}</Text>
+              <Text dimColor wrap="wrap">{c.what}</Text>
+            </Box>
+          )}
+          <Box>
+            <Button key={`tg-${c.key}`} plain dimColor={isOn ? true : undefined} label={isOn ? 'Turn off' : 'Turn on'} onPress={() => void flip(io, c.key)} />
+          </Box>
+        </Box>,
+      )
+    }
+    if (ws.imsRoot) sections.push(<Text key="ims-on" dimColor wrap="wrap">{'Always on in ims-nawy: its rules (PRs into staging, Mazen reviews, no merges, the nawy token, schema changes ask first).'}</Text>)
   }
 
   return <Box flexDirection="column">{sections}</Box>
