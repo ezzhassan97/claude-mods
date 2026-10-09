@@ -17,6 +17,9 @@ export const INK = {
 
 export type Ink = (typeof INK)[keyof typeof INK]
 
+/** Every text size is scaled by this: the desktop draws SVG text larger than the app's own. */
+export const FONT = 0.86
+
 const SANS = "ui-sans-serif, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif"
 const MONO = "ui-monospace, SFMono-Regular, Menlo, monospace"
 
@@ -72,7 +75,7 @@ export type Seg = {
 }
 
 function segWidth(s: Seg): number {
-  const size = s.size ?? 12.5
+  const size = (s.size ?? 12.5) * FONT
   if (s.dot) return 8
   if (s.bar) return s.bar.w
   const w = width(s.t ?? '', size, s)
@@ -80,7 +83,7 @@ function segWidth(s: Seg): number {
 }
 
 function drawSeg(s: Seg, x: number, y: number, text: string): string {
-  const size = s.size ?? 12.5
+  const size = (s.size ?? 12.5) * FONT
   if (s.dot) return `<circle cx="${x + 4}" cy="${y - size * 0.32}" r="3.6" fill="${s.dot}"${s.live ? ' class="live"' : ''}/>`
   if (s.bar) {
     const fill = Math.max(0, Math.min(1, s.bar.pct)) * s.bar.w
@@ -139,7 +142,7 @@ export class Canvas {
     let x = this.pad
     for (const [i, s] of left.entries()) {
       if (i) x += gapOf(s)
-      const size = s.size ?? 12.5
+      const size = (s.size ?? 12.5) * FONT
       const text = s.grow ? fit(s.t ?? '', each - (s.pill ? 12 : 0), size, s) : (s.t ?? '')
       if (s.grow && !text) continue
       const shown = { ...s, t: text }
@@ -161,8 +164,8 @@ export class Canvas {
   /** Small caps section label with an optional dim aside. */
   label(text: string, aside = '', color?: string): this {
     const base = this.y + 13
-    this.parts.push(`<text x="${this.pad}" y="${base}" font-family="${SANS}" font-size="10.5" font-weight="600" letter-spacing=".7" ${color ? `fill="${color}"` : 'class="s"'}>${esc(text.toUpperCase())}</text>`)
-    if (aside) this.parts.push(`<text x="${this.w - this.rpad}" y="${base}" text-anchor="end" font-family="${SANS}" font-size="11" class="m">${esc(aside)}</text>`)
+    this.parts.push(`<text x="${this.pad}" y="${base}" font-family="${SANS}" font-size="${10.5 * FONT}" font-weight="600" letter-spacing=".7" ${color ? `fill="${color}"` : 'class="s"'}>${esc(text.toUpperCase())}</text>`)
+    if (aside) this.parts.push(`<text x="${this.w - this.rpad}" y="${base}" text-anchor="end" font-family="${SANS}" font-size="${11 * FONT}" class="m">${esc(aside)}</text>`)
     this.y += 20
     return this
   }
@@ -175,8 +178,8 @@ export class Canvas {
       const x = this.pad + i * (tw + gap)
       this.parts.push(
         `<rect class="tile" x="${x}" y="${this.y}" width="${tw}" height="46" rx="9"/>` +
-          `<text x="${x + 11}" y="${this.y + 17}" font-family="${SANS}" font-size="10.5" class="s">${esc(it.label)}</text>` +
-          `<text x="${x + 11}" y="${this.y + 37}" font-family="${SANS}" font-size="16" font-weight="600" ${it.color ? `fill="${it.color}"` : 'class="t"'} font-variant-numeric="tabular-nums">${esc(fit(it.value, tw - 18, 16, { bold: true }))}</text>`,
+          `<text x="${x + 11}" y="${this.y + 17}" font-family="${SANS}" font-size="${10.5 * FONT}" class="s">${esc(it.label)}</text>` +
+          `<text x="${x + 11}" y="${this.y + 37}" font-family="${SANS}" font-size="${16 * FONT}" font-weight="600" ${it.color ? `fill="${it.color}"` : 'class="t"'} font-variant-numeric="tabular-nums">${esc(fit(it.value, tw - 18, 16 * FONT, { bold: true }))}</text>`,
       )
     })
     this.y += 54
@@ -201,7 +204,7 @@ export class Canvas {
 
   /** Wrapped text, up to `lines` lines, with an optional colored bullet. */
   text(body: string, opts: { cls?: 't' | 's' | 'm'; color?: string; size?: number; lines?: number; bullet?: string; indent?: number; reserve?: number } = {}): this {
-    const size = opts.size ?? 12.5
+    const size = (opts.size ?? 12.5) * FONT
     const indent = (opts.indent ?? 0) + (opts.bullet ? 14 : 0)
     const max = this.w - this.pad - this.rpad - indent - (opts.reserve ?? 0)
     const words = body.split(/\s+/).filter(Boolean)

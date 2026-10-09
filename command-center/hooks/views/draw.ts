@@ -69,10 +69,10 @@ export function drawBar(d: BarInput, w: number): string {
     right.push({ bar: { w: 40, pct: d.progress.done / d.progress.total, color: d.progress.done === d.progress.total ? INK.green : INK.clay }, size: 11.5 })
     right.push({ t: `${d.progress.done}/${d.progress.total}`, cls: 's', size: 11.5, gap: 5 })
   }
-  c.line(left, right, 24)
+  c.line(left, right, 21)
 
   const branches = d.focus?.branches ?? []
-  if (!branches.length) c.line([{ t: 'no git branch in view', cls: 'm', size: 12 }], usageSegs(d.usage), 21)
+  if (!branches.length) c.line([{ t: 'no git branch in view', cls: 'm', size: 12 }], usageSegs(d.usage), 18)
   branches.forEach((b, i) => {
     const pr = prFor(b, d.github.focus)
     const look = pr ? prLook(pr) : null
@@ -84,7 +84,7 @@ export function drawBar(d: BarInput, w: number): string {
     if (b.unpushed) segs.push({ t: `↑${b.unpushed} unpushed`, color: INK.amber, size: 11.5, gap: 6 })
     if (b.dirty) segs.push({ t: `${b.dirty} uncommitted`, color: INK.amber, size: 11.5, gap: 6 })
     segs.push(look ? { t: look.text, pill: look.color, size: 11 } : { t: 'no PR', cls: 'm', size: 11.5 })
-    c.line(segs, i === 0 ? usageSegs(d.usage) : [], 21)
+    c.line(segs, i === 0 ? usageSegs(d.usage) : [], 18)
   })
   c.space(4)
   return c.svg()
